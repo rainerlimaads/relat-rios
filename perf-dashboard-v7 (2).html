@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Performance Dashboard</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+html,body,#root{min-height:100vh;background:#0b1121;font-family:'Outfit',sans-serif;color:#eef2ff}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:#1a2b45}
+input,button{font-family:'Outfit',sans-serif}
+input[type=file]{display:none}
+.tab{cursor:pointer;font-size:12px;font-weight:500;padding:7px 16px;border-radius:8px;border:none;background:transparent;color:#3d5578;transition:all .18s;white-space:nowrap}
+.tab.on{background:#16233d;color:#eef2ff;box-shadow:inset 0 0 0 1px #1a2b45}
+.tab:hover:not(.on){color:#8ba4c8}
+.trow:hover{background:#16233d!important}
+.drop-zone{border:1.5px dashed #1a2b45;border-radius:12px;cursor:pointer;transition:all .25s;display:block;text-align:center}
+.drop-zone:hover,.drop-zone.over{border-color:#3b82f6;background:#1a336022}
+.drop-zone.done{border-color:#22c55e44;background:#0a241622}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fu{animation:fadeUp .3s ease both}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes funnelIn{from{opacity:0;transform:scaleX(.5)}to{opacity:1;transform:scaleX(1)}}
+@keyframes rateIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.txt-input{width:100%;background:#0f1a2e;border:1px solid #1a2b45;border-radius:10px;padding:10px 14px;color:#eef2ff;font-size:14px;outline:none;transition:border-color .2s}
+.txt-input:focus{border-color:#3b82f6}
+.btn-blue{padding:12px 0;border-radius:10px;cursor:pointer;background:#3b82f6;border:none;color:#fff;font-size:14px;font-weight:600;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-blue:hover{background:#2563eb}
+.btn-blue:disabled{opacity:.6;cursor:default}
+</style>
+</head>
+<body><div id="root"></div>
+<script type="text/babel">
+const {useState,useCallback,useEffect,useRef}=React;
+
+/* ── COLORS ── */
+const C={
+  bg:"#0b1121",s1:"#0f1a2e",s2:"#111d33",s3:"#16233d",
+  line:"#1a2b45",t0:"#eef2ff",t1:"#8ba4c8",t2:"#3d5578",t3:"#243050",
+  blue:"#3b82f6",blueDim:"#1a3360",
+  green:"#22c55e",greenDim:"#0a2416",
+  gold:"#f59e0b",goldDim:"#261a05",
+  red:"#ef4444",redDim:"#1f0707",
+  cyan:"#22d3ee",purple:"#a78bfa",
+  gBlue:"#4285f4",gBlueDim:"#0d1e3d",
+  lineHi:"#243655",
+};
+
+/* ── HELPERS ── */
+const brl=v=>v==null||isNaN(+v)||+v===0?"—":`R$\u202F${(+v).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const n0=v=>v==null||isNaN(+v)?"—":Math.round(+v).toLocaleString("pt-BR");
+const pct=v=>v==null||isNaN(+v)||+v===0?"—":`${(+v).toFixed(1)}%`;
+const k=v=>{if(!v||isNaN(+v)||+v===0)return"—";const n=+v;if(n>=1e6)return`${(n/1e6).toFixed(1)}M`;if(n>=1e3)return`${(n/1e3).toFixed(1)}k`;return String(Math.round(n));};
+const toNum=s=>{
+  if(!s||typeof s!=="string")return null;
+  const t=s.trim().replace(/[R$\u00a0%]/g,"").trim();
+  if(t===""||t==="–"||t==="—"||t==="-")return null;
+  let norm;
+  if(t.includes(",")&&t.includes(".")){norm=t.replace(/\./g,"").replace(",",".");}
+  else if(t.includes(",")){norm=t.replace(",",".");}
+  else{norm=t;}
+  const n=parseFloat(norm);return isNaN(n)?null:n;
+};
+const sumF=(arr,key)=>{const v=arr.map(r=>r[key]).filter(v=>v!=null&&!isNaN(v));return v.length?v.reduce((a,b)=>a+(+b),0):null;};
+
+/* ── META CSV PARSER ── */
+const META_COLS={
+  name:["Nome do anúncio","Ad name"],adset:["Nome do conjunto de anúncios","Ad set name"],
+  status:["Veiculação de anúncio","Veiculação","Delivery","Status"],
+  spend:["Valor usado (BRL)","Amount spent (BRL)","Amount spent","Valor usado"],
+  impressions:["Impressões","Impressions"],reach:["Alcance","Reach"],
+  link_clicks:["Cliques no link","Link clicks"],lp_views:["Visualizações da página de destino","Landing page views"],
+  messages:["Conversas por mensagem iniciadas","Messaging conversations started","Conversas iniciadas por mensagem"],
+  ctr:["CTR (taxa de cliques no link)","CTR (link click-through rate)","CTR"],
+  cpc:["CPC (custo por clique no link) (BRL)","CPC (cost per link click)","CPC"],
+  cpm:["CPM (custo por 1.000 impressões)","CPM (cost per 1,000 impressions)","CPM"],
+  frequency:["Frequência","Frequency"],cost_result:["Custo por resultados","Custo por resultado","Cost per result"],
+  video_3s:["Reproduções do vídeo por no mínimo 3 segundos","3-second video plays"],thruplays:["ThruPlays"],
+  hook_rate:["Hook Rate","custom_derived_metrics:1001657072556068"],
+  hold_rate:["Hold Rate","custom_derived_metrics:1001657709222671"],
+  connect_rate:["Connect Rate","custom_derived_metrics:1001658582555917"],
+  lead_rate:["Lead Rate","custom_derived_metrics:1001659125889196"],
+  cpl_msg:["CPL Mensagem","CPL","custom_derived_metrics:1001660305889078"],
+  // Ecommerce cols
+  purchases:["Compras","Purchase","Compras (valor do evento)"],
+  purchase_value:["Valor de conversão da compra","Valor de conversão de compras","Purchase conversion value","Receita"],
+  add_to_cart:["Adições ao carrinho","Adds to cart","Add to cart"],
+  checkout:["Finalizações de compra iniciadas","Checkouts iniciados","Checkouts initiated","Início de checkout"],
+  content_views:["Visualizações de conteúdo","Content views","View content","Visualizações da página de destino"],
+  cost_per_purchase:["Custo por compra (BRL)","Custo por compra","Cost per purchase","CPP (Custo por Compra)"],
+  roas:["ROAS (retorno sobre o investimento em publicidade) das compras","ROAS de compras","Purchase ROAS","ROAS"],
+  add_to_cart_rate:["Add to Cart Rate","custom_derived_metrics:add_cart_rate"],
+  checkout_rate:["Checkout Rate","custom_derived_metrics:checkout_rate"],
+  cvr:["CVR","Taxa de Conversão","custom_derived_metrics:cvr"],
+};
+function findIdx(headers,aliases){for(const a of aliases){const i=headers.findIndex(h=>h.trim()===a);if(i>=0)return i;}for(const a of aliases){const i=headers.findIndex(h=>h.toLowerCase().includes(a.toLowerCase()));if(i>=0)return i;}return -1;}
+function parseMetaCSV(text){
+  const lines=text.replace(/\r/g,"").split("\n").filter(l=>l.trim());
+  const sep=lines[0].includes(";")?";":","
+  const headers=lines[0].split(sep).map(h=>h.replace(/^"|"$/g,"").trim());
+  const idx={};for(const[k,a]of Object.entries(META_COLS))idx[k]=findIdx(headers,a);
+  const get=(row,key)=>idx[key]>=0?row[idx[key]]:null;
+  const parseRow=line=>{const row=[];let cur="";let inQ=false;for(let i=0;i<line.length;i++){if(line[i]==='"'){inQ=!inQ;}else if(line[i]===sep&&!inQ){row.push(cur.trim());cur="";}else{cur+=line[i];}}row.push(cur.trim());return row;};
+  const ads=lines.slice(1).map(parseRow).filter(r=>toNum(get(r,"spend"))>0).map(r=>{
+    const spend=toNum(get(r,"spend")),impressions=toNum(get(r,"impressions")),link_clicks=toNum(get(r,"link_clicks"));
+    // Meta exports custom metrics as decimals (0.35 = 35%) but CTR as % (2.5 = 2.5%)
+    // Norm: only multiply if value is between 0 and 0.99 (clearly a ratio/decimal)
+    const norm=v=>{if(v==null)return null;if(v>0&&v<1)return v*100;return v;};
+    return{name:get(r,"name")||"—",adset:get(r,"adset")||"—",status:get(r,"status")||"—",
+      spend,impressions,reach:toNum(get(r,"reach")),link_clicks,lp_views:toNum(get(r,"lp_views")),
+      messages:toNum(get(r,"messages")),ctr:toNum(get(r,"ctr")),cpc:toNum(get(r,"cpc")),cpm:toNum(get(r,"cpm")),
+      frequency:toNum(get(r,"frequency")),cost_result:toNum(get(r,"cost_result")),
+      video_3s:toNum(get(r,"video_3s")),thruplays:toNum(get(r,"thruplays")),
+      hook_rate:norm(toNum(get(r,"hook_rate"))),hold_rate:norm(toNum(get(r,"hold_rate"))),
+      connect_rate:norm(toNum(get(r,"connect_rate"))),lead_rate:norm(toNum(get(r,"lead_rate"))),
+      cpl_msg:toNum(get(r,"cpl_msg")),
+      purchases:toNum(get(r,"purchases")),purchase_value:toNum(get(r,"purchase_value")),
+      add_to_cart:toNum(get(r,"add_to_cart")),checkout:toNum(get(r,"checkout")),
+      content_views:toNum(get(r,"content_views")),cost_per_purchase:toNum(get(r,"cost_per_purchase")),
+      roas:toNum(get(r,"roas")),
+      add_to_cart_rate:norm(toNum(get(r,"add_to_cart_rate"))),
+      checkout_rate:norm(toNum(get(r,"checkout_rate"))),
+      cvr:norm(toNum(get(r,"cvr"))),};
+  });
+  if(!ads.length)return null;
+  const s={};
+  s.spend=sumF(ads,"spend");s.impressions=sumF(ads,"impressions");s.reach=sumF(ads,"reach");
+  s.link_clicks=sumF(ads,"link_clicks");s.lp_views=sumF(ads.filter(a=>a.lp_views>0),"lp_views")||null;
+  s.video_3s=sumF(ads.filter(a=>a.video_3s>0),"video_3s")||null;s.thruplays=sumF(ads.filter(a=>a.thruplays>0),"thruplays")||null;
+  s.messages=sumF(ads.filter(a=>a.messages>0),"messages")||null;
+  s.ctr=s.link_clicks&&s.impressions?s.link_clicks/s.impressions*100:null;
+  s.cpc=s.link_clicks&&s.spend?s.spend/s.link_clicks:null;
+  s.cpm=s.impressions&&s.spend?s.spend/s.impressions*1000:null;
+  s.frequency=s.impressions&&s.reach?s.impressions/s.reach:null;
+  s.connect_rate=s.lp_views&&s.link_clicks?s.lp_views/s.link_clicks*100:null;
+  if(s.video_3s&&s.impressions){s.hook_rate=s.video_3s/s.impressions*100;}
+  else{const hr=ads.map(a=>a.hook_rate).filter(v=>v!=null&&v>0);s.hook_rate=hr.length?hr.reduce((a,b)=>a+b,0)/hr.length:null;}
+  if(s.thruplays&&s.video_3s){s.hold_rate=s.thruplays/s.video_3s*100;}
+  else{const hd=ads.map(a=>a.hold_rate).filter(v=>v!=null&&v>0);s.hold_rate=hd.length?hd.reduce((a,b)=>a+b,0)/hd.length:null;}
+  s.lead_rate=s.messages&&s.link_clicks?s.messages/s.link_clicks*100:null;
+  const msgSpend=sumF(ads.filter(a=>a.messages>0),"spend");
+  s.cpl=s.messages&&msgSpend?msgSpend/s.messages:null;
+  s.cpl_total=s.messages&&s.spend?s.spend/s.messages:null;
+  // Ecommerce
+  s.purchases=sumF(ads.filter(a=>a.purchases>0),"purchases")||null;
+  s.purchase_value=sumF(ads.filter(a=>a.purchase_value>0),"purchase_value")||null;
+  s.add_to_cart=sumF(ads.filter(a=>a.add_to_cart>0),"add_to_cart")||null;
+  s.checkout=sumF(ads.filter(a=>a.checkout>0),"checkout")||null;
+  s.content_views=sumF(ads.filter(a=>a.content_views>0),"content_views")||null;
+  // ROAS: prefer native column, fallback to calculated
+  const roasNative=ads.map(a=>a.roas).filter(v=>v!=null&&v>0);
+  if(roasNative.length){const tot=ads.reduce((a,r)=>({spend:a.spend+(r.spend||0),pv:a.pv+(r.purchase_value||0)}),{spend:0,pv:0});s.roas=tot.pv&&tot.spend?tot.pv/tot.spend:roasNative.reduce((a,b)=>a+b,0)/roasNative.length;}
+  else{s.roas=s.purchase_value&&s.spend?s.purchase_value/s.spend:null;}
+  s.cpp=s.purchases&&s.spend?s.spend/s.purchases:null;
+  s.add_to_cart_rate=s.add_to_cart&&s.link_clicks?s.add_to_cart/s.link_clicks*100:null;
+  s.checkout_rate=s.checkout&&s.add_to_cart?s.checkout/s.add_to_cart*100:null;
+  s.cvr=s.purchases&&s.checkout?s.purchases/s.checkout*100:null;
+  // Detect account type
+  s.account_type=s.purchases>0?"ecommerce":s.messages>0?"messages":"unknown";
+  return{summary:s,ads};
+}
+
+/* ── GOOGLE ZIP PARSER ── */
+async function parseGoogleZip(file){
+  const zip=await JSZip.loadAsync(file);
+  const parseCSVLine=line=>{
+    const result=[];let cur="";let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){inQ=!inQ;}
+      else if(c===","&&!inQ){result.push(cur.trim());cur="";}
+      else{cur+=c;}
+    }
+    result.push(cur.trim());
+    return result;
+  };
+  const readCSV=async name=>{
+    const f=Object.values(zip.files).find(f=>f.name.includes(name));
+    if(!f)return[];
+    const txt=await f.async("string");
+    const lines=txt.replace(/\r/g,"").replace(/\u00a0/g," ").split("\n").filter(l=>l.trim());
+    const headers=parseCSVLine(lines[0]).map(h=>h.replace(/"/g,"").trim());
+    return lines.slice(1).filter(l=>l.trim()).map(line=>{
+      const vals=parseCSVLine(line);
+      return Object.fromEntries(headers.map((h,i)=>[h,(vals[i]||"").replace(/"/g,"").trim()]));
+    });
+  };
+  const campanhas=await readCSV("Campanhas");
+  const serie=await readCSV("Série_temporal");
+  const palavras=await readCSV("Palavras-chave");
+  const dispositivos=await readCSV("Dispositivos");
+  const pesquisas=await readCSV("Pesquisas(Pesquisar");
+
+  const camp=campanhas[0]||{};
+  const spend=toNum(camp["Custo"]);
+  const clicks=toNum(camp["Cliques"]);
+  const convs=toNum(camp["Conversões"]);
+  const totalImpr=serie.reduce((a,r)=>a+(toNum(r["Impressões"])||0),0);
+  const ctr=clicks&&totalImpr?clicks/totalImpr*100:null;
+  const cpl=spend&&convs?spend/convs:null;
+  const cpc=spend&&clicks?spend/clicks:null;
+  const cpm=spend&&totalImpr?spend/totalImpr*1000:null;
+
+  // mobile split
+  const smartphone=dispositivos.find(d=>d["Dispositivo"]==="Smartphones");
+  const mobilePct=smartphone&&spend?toNum(smartphone["Custo"])/spend*100:null;
+
+  // top search terms with conversions
+  const topTerms=pesquisas
+    .filter(r=>toNum(r["Custo"])>0)
+    .sort((a,b)=>(toNum(b["Custo"])||0)-(toNum(a["Custo"])||0))
+    .slice(0,10)
+    .map(r=>({term:r["Pesquisar"]||r[Object.keys(r)[0]],custo:toNum(r["Custo"]),cliques:toNum(r["Cliques"]),conversoes:toNum(r["Conversões"])}));
+
+  // keywords
+  const kws=palavras.map(r=>({
+    keyword:r["Palavra-chave da rede de pesquisa"]||"",
+    match:r["Tipo de corresp."]||"",
+    custo:toNum(r["Custo"]),cliques:toNum(r["Cliques"]),ctr:r["CTR"]
+  })).filter(k=>k.custo>0).sort((a,b)=>b.custo-a.custo);
+
+  const period=serie.length?`${serie[0]["Data"]} → ${serie[serie.length-1]["Data"]}`:null;
+
+  return{spend,clicks,conversions:convs,impressions:totalImpr,ctr,cpl,cpc,cpm,mobilePct,topTerms,kws,period,campaigns:campanhas};
+}
+
+/* ── FLAG ── */
+const BENCH={ctr:1,hook:25,hold:30,connect:70,lead_rate:5,freq:2.5};
+
+/* ── NICHO BENCHMARKS ─────────────────────────────────────── */
+const NICHO_BENCH = {
+  "moveis_planejados":    { ctr:1.2, hook:25, hold:28, connect:68, lead_rate:4, freq:2.5, cpl:25,  label:"Móveis Planejados" },
+  "vestuario":            { ctr:1.5, hook:30, hold:32, connect:72, atc:6,  checkout:45, cvr:28, roas:3, cpm:12, label:"Vestuário" },
+  "atacado":              { ctr:1.0, hook:22, hold:25, connect:65, lead_rate:3, freq:2.8, cpl:15, label:"Atacado" },
+  "saude_nutro":          { ctr:1.2, hook:24, hold:28, connect:65, lead_rate:4, freq:2.2, cpl:20, label:"Saúde / Nutrologia" },
+  "odontologia":          { ctr:1.1, hook:23, hold:27, connect:67, lead_rate:3.5, freq:2.0, cpl:30, label:"Odontologia" },
+  "restaurante":          { ctr:1.8, hook:28, hold:30, connect:70, lead_rate:5, freq:3.0, cpl:10, label:"Restaurante" },
+  "farmacia":             { ctr:1.3, hook:24, hold:26, connect:68, lead_rate:4, freq:2.5, cpl:18, label:"Farmácia" },
+  "seguros":              { ctr:1.0, hook:22, hold:25, connect:60, lead_rate:3, freq:2.0, cpl:40, label:"Seguros / Consórcios" },
+  "ecommerce_moda":       { ctr:1.5, hook:30, hold:32, connect:72, atc:6,  checkout:45, cvr:28, roas:3,   cpm:14, label:"E-commerce Moda" },
+  "ecommerce_geral":      { ctr:1.2, hook:26, hold:28, connect:68, atc:5,  checkout:40, cvr:25, roas:2.5, cpm:12, label:"E-commerce Geral" },
+  "acougue":              { ctr:1.2, hook:24, hold:26, connect:65, lead_rate:4, freq:2.8, cpl:12, label:"Açougue" },
+  "celulares":            { ctr:1.3, hook:25, hold:28, connect:68, lead_rate:4, freq:2.5, cpl:20, label:"Celulares" },
+  "artesanato":           { ctr:1.4, hook:27, hold:30, connect:70, atc:5, checkout:40, cvr:25, roas:2.5, cpm:10, label:"Artesanato" },
+  "generico":             { ctr:1.0, hook:25, hold:30, connect:70, lead_rate:5, freq:2.5, cpl:20, label:"Geral" },
+};
+function getBench(nicho, isEcom){
+  if(!nicho) return isEcom ? NICHO_BENCH.ecommerce_geral : NICHO_BENCH.generico;
+  return NICHO_BENCH[nicho] || (isEcom ? NICHO_BENCH.ecommerce_geral : NICHO_BENCH.generico);
+}
+function benchFlag(val, benchVal, dir="up"){
+  if(val==null||benchVal==null) return null;
+  const g = dir==="up" ? val>=benchVal : val<=benchVal;
+  const m = dir==="up" ? val>=benchVal*.65 : val<=benchVal*1.35;
+  return g?"ok":m?"warn":"bad";
+}
+function benchDiff(val, benchVal, dir="up"){
+  if(val==null||benchVal==null) return null;
+  const diff = dir==="up" ? ((val-benchVal)/benchVal*100) : ((benchVal-val)/benchVal*100);
+  return diff;
+}
+
+
+const flag=(v,b,dir="up")=>{if(v==null||b==null)return null;const g=dir==="up"?v>=b:v<=b;const m=dir==="up"?v>=b*.6:v<=b*1.4;return g?"ok":m?"warn":"bad";};
+const FC={ok:C.green,warn:C.gold,bad:C.red};
+const FL={ok:"OK",warn:"Atenção",bad:"Gargalo"};
+function Badge({f}){if(!f)return null;const c=FC[f];return<span style={{fontSize:10,fontWeight:600,letterSpacing:".05em",padding:"2px 10px",borderRadius:20,whiteSpace:"nowrap",background:c+"1a",color:c,border:`1px solid ${c}44`}}>{FL[f]}</span>;}
+
+/* ── COMPONENTS ── */
+function KCard({label,value,sub,accent,f,i=0,platform}){
+  const borderColor=platform==="google"?C.gBlue:platform==="meta"?C.blue:accent||(f?FC[f]:C.line);
+  return<div className="fu" style={{animationDelay:`${i*50}ms`,background:C.s1,borderRadius:12,border:`1px solid ${f?FC[f]+"44":C.line}`,borderTop:`3px solid ${borderColor}`,padding:"18px 20px",flex:"1 1 140px",minWidth:0,position:"relative"}}>
+    <div style={{fontSize:10,color:C.t2,fontWeight:500,marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
+      {platform==="google"&&<span style={{fontSize:10,color:C.gBlue}}>G</span>}
+      {platform==="meta"&&<span style={{fontSize:10,color:C.blue}}>M</span>}
+      {label}
+    </div>
+    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:22,fontWeight:600,color:accent||(f?FC[f]:C.t0),lineHeight:1,letterSpacing:"-.01em"}}>{value}</div>
+    {sub&&<div style={{fontSize:11,color:C.t1,marginTop:5}}>{sub}</div>}
+    {f&&<div style={{position:"absolute",top:12,right:12}}><Badge f={f}/></div>}
+  </div>;
+}
+
+
+/* ── REAL FUNNEL SHAPE ─────────────────────────────────────── */
+function RealFunnel({s, visible, nicho}){
+  const [tooltip, setTooltip] = useState(null);
+  const isEcom = s.account_type === "ecommerce";
+  const bench = getBench(nicho, isEcom);
+
+  const stagesRaw = isEcom ? [
+    {id:"imp",  label:"Impressões",      val:s.impressions,   color:["#1a56db","#1e65f0"], rate:null, rLabel:null, bk:null},
+    {id:"rch",  label:"Alcance",         val:s.reach,         color:["#1b6fc8","#2080e0"], rate:s.reach&&s.impressions?s.reach/s.impressions*100:null, rLabel:"Cobertura", bk:"connect"},
+    {id:"clk",  label:"Cliques no link", val:s.link_clicks,   color:["#1c7fb5","#2490cc"], rate:s.ctr, rLabel:"CTR", bk:"ctr"},
+    {id:"lpv",  label:"Views na LP",     val:s.content_views||s.lp_views, color:["#1d8ea0","#28a0b8"], rate:(s.content_views||s.lp_views)&&s.link_clicks?(s.content_views||s.lp_views)/s.link_clicks*100:null, rLabel:"Connect Rate", bk:"connect"},
+    {id:"atc",  label:"Add to Cart",     val:s.add_to_cart,   color:["#1e9d88","#2ab098"], rate:s.add_to_cart_rate, rLabel:"ATC Rate", bk:"atc"},
+    {id:"chk",  label:"Checkout",        val:s.checkout,      color:["#1faa60","#26c070"], rate:s.checkout_rate, rLabel:"Checkout Rate", bk:"checkout"},
+    {id:"pur",  label:"Compras",         val:s.purchases,     color:["#20b840","#28cc50"], rate:s.cvr, rLabel:"CVR", bk:"cvr"},
+  ] : [
+    {id:"imp",  label:"Impressões",      val:s.impressions,   color:["#1a56db","#1e65f0"], rate:null, rLabel:null, bk:null},
+    {id:"rch",  label:"Alcance",         val:s.reach,         color:["#1b6fc8","#2080e0"], rate:s.reach&&s.impressions?s.reach/s.impressions*100:null, rLabel:"Cobertura", bk:"connect"},
+    {id:"clk",  label:"Cliques no link", val:s.link_clicks,   color:["#1c8ab5","#2499cc"], rate:s.ctr, rLabel:"CTR", bk:"ctr"},
+    {id:"lpv",  label:"Views na LP",     val:s.lp_views,      color:["#1d9fa0","#26b5b8"], rate:s.connect_rate, rLabel:"Connect Rate", bk:"connect"},
+    {id:"msg",  label:"Conversas",       val:s.messages,      color:["#1eb480","#22cc90"], rate:s.lp_views&&s.messages?s.messages/s.lp_views*100:null, rLabel:"Conv. LP", bk:"lead_rate"},
+  ].filter(x => x.val != null && x.val > 0);
+
+  const maxVal = stagesRaw[0]?.val || 1;
+  const N = stagesRaw.length;
+  // Width goes from 100% at top to 30% at bottom
+  const widths = stagesRaw.map((_, i) => 100 - (i / Math.max(N-1,1)) * 68);
+
+  const worst = stagesRaw.filter(x=>x.rate!=null&&x.bk&&bench[x.bk]).sort((a,b)=>(a.rate/(bench[a.bk]||1))-(b.rate/(bench[b.bk]||1)))[0];
+
+  const tt = tooltip ? stagesRaw.find(s=>s.id===tooltip) : null;
+  const ttBench = tt?.bk ? bench[tt.bk] : null;
+  const ttFlag = tt && ttBench ? benchFlag(tt.rate, ttBench) : null;
+  const ttDiff = tt && ttBench ? benchDiff(tt.rate, ttBench) : null;
+
+  return (
+    <div style={{position:"relative"}}>
+      {/* Funnel stages */}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
+        {stagesRaw.map((st, i) => {
+          const w = widths[i];
+          const isWorst = worst && st.id === worst.id;
+          const f = st.bk && bench[st.bk] ? benchFlag(st.rate, bench[st.bk]) : null;
+          const isLast = i === N - 1;
+          const delay = i * 80;
+
+          return (
+            <div key={st.id} style={{width:`${w}%`, minWidth:200, position:"relative",
+              animation: visible ? `funnelIn .5s cubic-bezier(.22,.68,0,1.15) ${delay}ms both` : "none"}}>
+
+              {/* Connector with rate badge */}
+              {i > 0 && st.rate != null && (
+                <div style={{position:"absolute",top:-18,left:"50%",transform:"translateX(-50%)",
+                  display:"flex",alignItems:"center",gap:6,zIndex:10,whiteSpace:"nowrap"}}>
+                  <button onClick={()=>setTooltip(tooltip===st.id?null:st.id)} style={{
+                    fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,
+                    color:"#fff",
+                    background:f?FC[f]:C.s3,
+                    border:`1.5px solid ${f?FC[f]+"99":"#ffffff33"}`,
+                    padding:"2px 11px",borderRadius:20,cursor:"pointer",
+                    boxShadow:f?`0 0 10px ${FC[f]}55`:"none",
+                    transition:"all .15s",
+                  }}>{pct(st.rate)}</button>
+                  <span style={{fontSize:10,color:"#ffffff88",letterSpacing:".04em"}}>{st.rLabel}</span>
+                  {f && <Badge f={f}/>}
+                </div>
+              )}
+
+              {/* Stage bar - trapezoid via clip-path */}
+              <div style={{
+                marginTop: i > 0 ? 22 : 0,
+                height:52,
+                background:`linear-gradient(135deg,${st.color[0]},${st.color[1]})`,
+                clipPath: isLast
+                  ? `polygon(4% 0%, 96% 0%, 98% 100%, 2% 100%)`
+                  : `polygon(0% 0%, 100% 0%, 98% 100%, 2% 100%)`,
+                display:"flex",alignItems:"center",justifyContent:"space-between",
+                padding:"0 20px",
+                boxShadow: isWorst
+                  ? `0 0 0 2px ${C.red}, 0 0 24px ${C.red}66`
+                  : `0 2px 12px rgba(0,0,0,.4)`,
+                position:"relative",
+                transition:"box-shadow .2s",
+              }}>
+                <span style={{
+                  fontFamily:"'Outfit',sans-serif",fontSize:13,fontWeight:700,
+                  color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,.6)",letterSpacing:".02em",
+                }}>{st.label}</span>
+                <span style={{
+                  fontFamily:"'JetBrains Mono',monospace",fontSize:18,fontWeight:700,
+                  color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,.6)",
+                }}>{k(st.val)}</span>
+                {isWorst && (
+                  <div style={{position:"absolute",right:-90,top:"50%",transform:"translateY(-50%)",
+                    fontSize:9,fontWeight:700,letterSpacing:".1em",color:C.red,
+                    background:C.redDim,border:`1px solid ${C.red}55`,
+                    padding:"3px 10px",borderRadius:20,whiteSpace:"nowrap"}}>GARGALO</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Tooltip overlay */}
+      {tt && tt.rate != null && (
+        <div style={{
+          position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",
+          zIndex:100,background:C.s1,border:`1.5px solid ${ttFlag?FC[ttFlag]+"66":C.lineHi||C.line}`,
+          borderRadius:14,padding:"18px 22px",minWidth:240,
+          boxShadow:"0 16px 40px rgba(0,0,0,.7)",
+        }} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <span style={{fontSize:13,fontWeight:700,color:C.t0}}>{tt.rLabel}</span>
+            <button onClick={()=>setTooltip(null)} style={{background:"transparent",border:"none",color:C.t2,cursor:"pointer",fontSize:16,lineHeight:1}}>✕</button>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+            <span style={{fontSize:12,color:C.t2}}>Sua conta</span>
+            <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:18,fontWeight:700,color:ttFlag?FC[ttFlag]:C.t0}}>{pct(tt.rate)}</span>
+          </div>
+          {ttBench && <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
+            <span style={{fontSize:12,color:C.t2}}>Benchmark {nicho?(NICHO_BENCH[nicho]||NICHO_BENCH.generico).label:""}</span>
+            <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:16,color:C.t1}}>{pct(ttBench)}</span>
+          </div>}
+          {ttDiff != null && <div style={{
+            fontSize:13,fontWeight:700,textAlign:"center",
+            color:ttFlag?FC[ttFlag]:C.t2,
+            background:ttFlag?FC[ttFlag]+"18":C.s2,
+            padding:"8px 0",borderRadius:8,
+          }}>{ttDiff>0?`▲ ${ttDiff.toFixed(0)}% acima do benchmark`:`▼ ${Math.abs(ttDiff).toFixed(0)}% abaixo do benchmark`}</div>}
+        </div>
+      )}
+
+      {/* Overlay backdrop */}
+      {tooltip && <div style={{position:"fixed",inset:0,zIndex:90}} onClick={()=>setTooltip(null)}/>}
+
+      {/* Bottom metrics strip */}
+      <div style={{display:"flex",marginTop:24,flexWrap:"wrap",gap:1,
+        background:C.s2,borderRadius:10,border:`1px solid ${C.line}`,overflow:"hidden"}}>
+        {(isEcom?[
+          ["CPM", brl(s.cpm), null, null],
+          ["CTR", pct(s.ctr), "ctr", "up"],
+          ["CPC", brl(s.cpc), null, null],
+          ["CPP", brl(s.cpp), null, null],
+          ["ROAS", s.roas?`${(+s.roas).toFixed(2)}x`:null, "roas", "up"],
+          ["Freq.", s.frequency?(+s.frequency).toFixed(2):"—", "freq", "down"],
+        ]:[
+          ["CPM", brl(s.cpm), null, null],
+          ["CTR", pct(s.ctr), "ctr", "up"],
+          ["CPC", brl(s.cpc), null, null],
+          ["CPL", brl(s.cpl), null, null],
+          ["Freq.", s.frequency?(+s.frequency).toFixed(2):"—", "freq", "down"],
+        ]).filter(([,v])=>v&&v!=="—").map(([label,value,bk,dir],idx,arr)=>{
+          const bv = bk ? bench[bk] : null;
+          const rawNum = value ? parseFloat(String(value).replace(/[^0-9.,]/g,"").replace(",",".")) : null;
+          const f = bv && rawNum ? benchFlag(rawNum, bv, dir) : null;
+          return (
+            <div key={label} style={{flex:"1 1 80px",padding:"12px 16px",
+              borderRight:idx<arr.length-1?`1px solid ${C.line}`:"none"}}>
+              <div style={{fontSize:9,color:C.t2,marginBottom:4,letterSpacing:".08em",fontFamily:"'Outfit',sans-serif"}}>{label}</div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:15,fontWeight:700,color:f?FC[f]:C.t0}}>{value}</div>
+              {bv && <div style={{fontSize:9,color:C.t3,marginTop:2}}>ref {bk==="roas"?`${bv}x`:pct(bv)}</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Keep old MetaFunnel as alias for backward compat
+function MetaFunnel({s,visible,nicho}){ return <RealFunnel s={s} visible={visible} nicho={nicho}/>; }
+
+
+function GooglePanel({g}){
+  return<div style={{display:"flex",flexDirection:"column",gap:16}}>
+    {/* KPIs */}
+    <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+      <KCard label="Investimento" value={brl(g.spend)} platform="google" i={0}/>
+      <KCard label="Conversões" value={n0(g.conversions)} sub={`CPL ${brl(g.cpl)}`} platform="google" i={1}/>
+      <KCard label="Cliques" value={n0(g.clicks)} sub={`CPC ${brl(g.cpc)}`} platform="google" i={2}/>
+      <KCard label="Impressões" value={k(g.impressions)} sub={`CPM ${brl(g.cpm)}`} platform="google" i={3}/>
+      <KCard label="CTR" value={pct(g.ctr)} f={flag(g.ctr,BENCH.ctr)} platform="google" i={4}/>
+      {g.mobilePct&&<KCard label="Mobile" value={pct(g.mobilePct)} sub="do investimento" platform="google" i={5}/>}
+    </div>
+
+    {/* Keywords + Search Terms */}
+    <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+      {g.kws?.length>0&&<div style={{flex:"1 1 280px",background:C.s1,border:`1px solid ${C.line}`,borderRadius:12,padding:20}}>
+        <div style={{fontSize:12,fontWeight:600,color:C.t1,marginBottom:14}}>Palavras-chave ativas</div>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+          <thead><tr style={{borderBottom:`1px solid ${C.line}`}}>
+            {["Palavra-chave","Tipo","Gasto","Cliques","CTR"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:9,color:C.t2,letterSpacing:".06em",fontWeight:600}}>{h.toUpperCase()}</th>)}
+          </tr></thead>
+          <tbody>{g.kws.map((kw,i)=><tr key={i} className="trow" style={{borderBottom:`1px solid ${C.line}22`}}>
+            <td style={{padding:"7px 8px",color:C.t0,fontFamily:"'Outfit',sans-serif",fontSize:11,maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{kw.keyword}</td>
+            <td style={{padding:"7px 8px",color:C.t2,fontSize:10,whiteSpace:"nowrap"}}>{kw.match?.replace("Correspondência ","").replace("Corresp. de ","frase")}</td>
+            <td style={{padding:"7px 8px",color:C.gBlue,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,whiteSpace:"nowrap"}}>{brl(kw.custo)}</td>
+            <td style={{padding:"7px 8px",color:C.t1,fontFamily:"'JetBrains Mono',monospace"}}>{n0(kw.cliques)}</td>
+            <td style={{padding:"7px 8px",color:C.t1,fontFamily:"'JetBrains Mono',monospace"}}>{kw.ctr||"—"}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>}
+
+      {g.topTerms?.length>0&&<div style={{flex:"1 1 260px",background:C.s1,border:`1px solid ${C.line}`,borderRadius:12,padding:20}}>
+        <div style={{fontSize:12,fontWeight:600,color:C.t1,marginBottom:4}}>Termos de pesquisa</div>
+        <div style={{fontSize:11,color:C.t2,marginBottom:14}}>O que as pessoas buscaram antes de clicar</div>
+        {g.topTerms.map((t,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:`1px solid ${C.line}22`}}>
+          <span style={{fontSize:11,color:C.t1,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",paddingRight:8}}>{t.term}</span>
+          <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:C.gBlue,flexShrink:0}}>{brl(t.custo)}</span>
+        </div>)}
+      </div>}
+    </div>
+  </div>;
+}
+
+function MetaAdsTable({ads, accountType}){
+  const [filter,setFilter]=useState("all");
+  const isEcom = accountType==="ecommerce";
+  const isActive=a=>["active","ativo"].includes((a.status||"").toLowerCase());
+  const isND=a=>(a.status||"").toLowerCase()==="not_delivering";
+
+  if(!ads||!ads.length) return<div style={{padding:32,textAlign:"center",color:C.t2,fontFamily:"'Outfit',sans-serif"}}>Sem dados de anúncios</div>;
+
+  const sorted=[...ads].sort((a,b)=>{
+    const getVal=r=>isEcom?(r.purchases||0):(r.messages||0);
+    return getVal(b)-getVal(a);
+  });
+  const shown=filter==="active"?sorted.filter(isActive):filter==="paused"?sorted.filter(a=>!isActive(a)):sorted;
+  const best=shown.length>0?shown[0]:null;
+  const hasBest=best&&(isEcom?best.purchases>0:best.messages>0);
+
+  const Td=({children,style={}})=><td style={{padding:"9px 12px",fontFamily:"'JetBrains Mono',monospace",...style}}>{children}</td>;
+
+  return(
+    <div>
+      {/* Filter buttons */}
+      <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
+        {[["all","Todos",ads.length],["active","Ativos",ads.filter(isActive).length],["paused","Inativos",ads.filter(a=>!isActive(a)).length]].map(([f,l,c])=>(
+          <button key={f} onClick={()=>setFilter(f)} style={{fontSize:12,fontWeight:500,padding:"5px 14px",borderRadius:8,cursor:"pointer",fontFamily:"'Outfit',sans-serif",background:filter===f?C.blue:C.s2,color:filter===f?"#fff":C.t2,border:"1px solid "+(filter===f?C.blue:C.line)}}>{l} ({c})</button>
+        ))}
+        <div style={{marginLeft:"auto",fontSize:11,color:C.t2,fontFamily:"'Outfit',sans-serif"}}>Ordenado por {isEcom?"compras":"conversas"} ↓</div>
+      </div>
+
+      {/* Best performer */}
+      {hasBest&&(
+        <div style={{background:C.s2,border:"1px solid "+C.green+"44",borderLeft:"4px solid "+C.green,borderRadius:12,padding:"14px 18px",marginBottom:14}}>
+          <div style={{fontSize:9,color:C.green,letterSpacing:".1em",fontWeight:700,marginBottom:6,fontFamily:"'Outfit',sans-serif"}}>🏆 MELHOR CRIATIVO</div>
+          <div style={{display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
+            <div style={{flex:1,minWidth:180}}>
+              <div style={{fontSize:13,color:C.t0,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{best.name}</div>
+              <div style={{fontSize:11,color:C.t2,marginTop:2}}>{best.adset}</div>
+            </div>
+            {isEcom&&[
+              ["COMPRAS",n0(best.purchases),C.green],
+              ["RECEITA",brl(best.purchase_value),C.green],
+              ["CPA",brl(best.purchases>0?best.spend/best.purchases:null),C.t0],
+              ["TICKET MÉDIO",brl(best.purchases>0&&best.purchase_value?best.purchase_value/best.purchases:null),C.t0],
+              ["ROAS",best.roas?(+best.roas).toFixed(2)+"x":"—",best.roas>=3?C.green:best.roas>=1.5?C.gold:C.red],
+            ].map(([lbl,val,col])=>(
+              <div key={lbl} style={{textAlign:"center"}}>
+                <div style={{fontSize:9,color:C.t2,letterSpacing:".06em",fontFamily:"'Outfit',sans-serif",marginBottom:3}}>{lbl}</div>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:16,fontWeight:700,color:col}}>{val}</div>
+              </div>
+            ))}
+            {!isEcom&&[
+              ["CONVERSAS",n0(best.messages),C.green],
+              ["CPL",brl(best.messages>0?best.spend/best.messages:null),C.t0],
+              ["CTR",pct(best.ctr),C.t0],
+              ["GASTO",brl(best.spend),C.blue],
+            ].map(([lbl,val,col])=>(
+              <div key={lbl} style={{textAlign:"center"}}>
+                <div style={{fontSize:9,color:C.t2,letterSpacing:".06em",fontFamily:"'Outfit',sans-serif",marginBottom:3}}>{lbl}</div>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:16,fontWeight:700,color:col}}>{val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div style={{overflowX:"auto",borderRadius:12,border:"1px solid "+C.line,background:C.s1}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead>
+            <tr style={{borderBottom:"1px solid "+C.line}}>
+              {["#","Status","Anúncio","Conjunto","Gasto","Impressões","Cliques","CTR","Hook","Hold",
+                ...(isEcom?["Compras","Receita","CPA","T. Médio","ROAS"]:["Connect","Lead Rate","CPL","Freq."])
+              ].map(h=>(
+                <th key={h} style={{padding:"10px 12px",textAlign:"left",fontSize:9,fontWeight:600,color:C.t2,letterSpacing:".04em",whiteSpace:"nowrap",fontFamily:"'Outfit',sans-serif"}}>{h.toUpperCase()}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((r,i)=>{
+              const act=isActive(r),nd=isND(r);
+              const sc=act?C.green:nd?C.gold:C.t3;
+              const sl=act?"Ativo":nd?"Não entrega":"Inativo";
+              const cpa=r.purchases>0&&r.spend?r.spend/r.purchases:null;
+              const ticket=r.purchases>0&&r.purchase_value?r.purchase_value/r.purchases:null;
+              const cpl=r.cpl_msg||(r.messages&&r.spend?r.spend/r.messages:null)||r.cost_result;
+              const isBestRow=i===0&&hasBest;
+              return(
+                <tr key={i} className="trow" style={{borderBottom:"1px solid "+C.line+"22",background:isBestRow?C.green+"08":"transparent"}}>
+                  <Td style={{color:isBestRow?C.green:C.t2,fontSize:10}}>{isBestRow?"🏆":i+1}</Td>
+                  <Td>
+                    <span style={{fontSize:10,fontWeight:600,padding:"2px 10px",borderRadius:20,whiteSpace:"nowrap",background:sc+"1a",color:sc,border:"1px solid "+sc+"44"}}>{sl}</span>
+                  </Td>
+                  <Td style={{color:C.t0,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:isBestRow?600:400,fontFamily:"'Outfit',sans-serif"}}>{r.name}</Td>
+                  <Td style={{color:C.t2,fontSize:11,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Outfit',sans-serif"}}>{r.adset}</Td>
+                  <Td style={{color:C.blue,fontWeight:600,whiteSpace:"nowrap"}}>{brl(r.spend)}</Td>
+                  <Td style={{color:C.t1}}>{k(r.impressions)}</Td>
+                  <Td style={{color:r.link_clicks>0?C.cyan:C.t3,fontWeight:r.link_clicks>0?600:400}}>{n0(r.link_clicks)||"—"}</Td>
+                  <Td><span style={{color:r.ctr>=2?C.green:r.ctr>=1?C.gold:r.ctr?C.red:C.t3,fontWeight:600}}>{r.ctr?pct(r.ctr):"—"}</span></Td>
+                  <Td><span style={{color:r.hook_rate>=25?C.green:r.hook_rate>=15?C.gold:r.hook_rate?C.red:C.t3}}>{pct(r.hook_rate)}</span></Td>
+                  <Td><span style={{color:r.hold_rate>=30?C.green:r.hold_rate>=18?C.gold:r.hold_rate?C.red:C.t3}}>{pct(r.hold_rate)}</span></Td>
+                  {isEcom&&<Td style={{fontWeight:600,color:r.purchases>0?C.green:C.t3}}>{n0(r.purchases)||"—"}</Td>}
+                  {isEcom&&<Td style={{color:r.purchase_value>0?C.green:C.t3,whiteSpace:"nowrap"}}>{brl(r.purchase_value)}</Td>}
+                  {isEcom&&<Td style={{color:C.t1,whiteSpace:"nowrap"}}>{brl(cpa)}</Td>}
+                  {isEcom&&<Td style={{color:C.t1,whiteSpace:"nowrap"}}>{brl(ticket)}</Td>}
+                  {isEcom&&<Td><span style={{color:r.roas>=3?C.green:r.roas>=1.5?C.gold:r.roas?C.red:C.t3,fontWeight:r.roas?600:400}}>{r.roas?((+r.roas).toFixed(2)+"x"):"—"}</span></Td>}
+                  {!isEcom&&<Td><span style={{color:r.connect_rate>=70?C.green:r.connect_rate>=50?C.gold:r.connect_rate?C.red:C.t3}}>{pct(r.connect_rate)}</span></Td>}
+                  {!isEcom&&<Td><span style={{color:r.lead_rate>=5?C.green:r.lead_rate>=2?C.gold:r.lead_rate?C.red:C.t3}}>{pct(r.lead_rate)}</span></Td>}
+                  {!isEcom&&<Td style={{color:C.t1,whiteSpace:"nowrap"}}>{brl(cpl)}</Td>}
+                  {!isEcom&&<Td><span style={{color:r.frequency>3?C.red:r.frequency>2.5?C.gold:C.t1}}>{r.frequency?(+r.frequency).toFixed(2):"—"}</span></Td>}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+function MsgTab({meta,google,clientName,apiKey}){
+  const [msg,setMsg]=useState("");const [loading,setLoading]=useState(false);const [copied,setCopied]=useState(false);
+  const generate=async()=>{
+    if(!apiKey){alert("Configure a chave da API no ⚙");return;}
+    setLoading(true);setMsg("");
+    try{
+      const ms=meta?.summary,g=google;
+      const hasMeta=!!ms,hasGoogle=!!g;
+      const parts=[];
+      if(hasMeta){
+        if(ms.account_type==="ecommerce"){
+          parts.push(`META ADS: R$ ${(ms.spend||0).toFixed(2)} investidos · ${ms.purchases||0} compras · ROAS ${ms.roas?(+ms.roas).toFixed(2)+"x":"—"} · CPP R$ ${(ms.cpp||0).toFixed(2)} · CTR ${(ms.ctr||0).toFixed(1)}% · Hook Rate ${(ms.hook_rate||0).toFixed(1)}%`);
+        } else {
+          parts.push(`META ADS: R$ ${(ms.spend||0).toFixed(2)} investidos · ${ms.messages||0} conversas WhatsApp · CPL R$ ${(ms.cpl||0).toFixed(2)} · CTR ${(ms.ctr||0).toFixed(1)}% · Hook Rate ${(ms.hook_rate||0).toFixed(1)}% · Hold Rate ${(ms.hold_rate||0).toFixed(1)}%`);
+        }
+      }
+      if(hasGoogle){parts.push(`GOOGLE ADS: R$ ${(g.spend||0).toFixed(2)} investidos · ${g.conversions||0} conversões · CPL R$ ${(g.cpl||0).toFixed(2)} · CTR ${(g.ctr||0).toFixed(1)}% · ${g.mobilePct?.toFixed(0)||0}% mobile`);}
+      const totalSpend=(ms?.spend||0)+(g?.spend||0);
+      const bottlenecks=[];
+      if(ms?.hook_rate<25)bottlenecks.push(`Hook Rate Meta baixo (${(ms.hook_rate||0).toFixed(1)}%)`);
+      if(ms?.ctr<1)bottlenecks.push(`CTR Meta baixo (${(ms.ctr||0).toFixed(1)}%)`);
+      if(g?.ctr<1)bottlenecks.push(`CTR Google baixo (${(g.ctr||0).toFixed(1)}%)`);
+      const prompt=`Você é um gestor de tráfego pago escrevendo uma mensagem de WhatsApp de CS para um cliente.
+
+DADOS:
+- Cliente: ${clientName||"cliente"}
+- Investimento total: R$ ${totalSpend.toFixed(2)}
+${parts.join("\n")}
+${bottlenecks.length?`- Gargalos identificados: ${bottlenecks.join(", ")}`:"- Boa performance geral"}
+
+REGRAS:
+- Tom próximo, profissional, sem ser robótico
+- Linguagem simples — cliente não é especialista em tráfego
+- Máximo 3 blocos: números do período · o que está bem · o que será otimizado
+- Não fale como quem acabou de descobrir um problema — fale como quem está acompanhando de perto
+- Termine com próxima ação concreta
+- Formato WhatsApp: *negrito*, emojis com moderação
+- Sem saudação genérica, vá direto aos números
+- Máximo 200 palavras`;
+      const res=await fetch("https://anthropic-proxy.rainerlima-ads.workers.dev",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,messages:[{role:"user",content:prompt}]})});
+      const data=await res.json();
+      if(data.error)throw new Error(data.error.message);
+      setMsg(data.content?.[0]?.text||"Erro ao gerar.");
+    }catch(e){setMsg("Erro: "+e.message);}
+    setLoading(false);
+  };
+  const copy=()=>{navigator.clipboard.writeText(msg).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);});};
+  return<div className="fu" style={{display:"flex",flexDirection:"column",gap:16,maxWidth:640}}>
+    <div style={{background:C.s1,border:`1px solid ${C.line}`,borderRadius:14,padding:"22px 26px"}}>
+      <div style={{fontSize:14,fontWeight:600,color:C.t0,marginBottom:4}}>Mensagem de CS para o cliente</div>
+      <div style={{fontSize:12,color:C.t2,marginBottom:20}}>Gerada com base nos dados reais — pronta para copiar e enviar no WhatsApp</div>
+      <div style={{marginBottom:18,background:C.s2,border:`1px solid ${C.line}`,borderRadius:8,padding:"8px 12px"}}>
+        <div style={{fontSize:10,color:C.t2,marginBottom:2}}>Cliente</div>
+        <div style={{fontSize:13,color:C.t1}}>{clientName||<span style={{color:C.t3}}>Nome não informado</span>}</div>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+        {meta&&<div style={{fontSize:11,padding:"4px 12px",borderRadius:20,background:C.blueDim,color:C.blue,border:`1px solid ${C.blue}44`}}>✓ Meta Ads</div>}
+        {google&&<div style={{fontSize:11,padding:"4px 12px",borderRadius:20,background:C.gBlueDim,color:C.gBlue,border:`1px solid ${C.gBlue}44`}}>✓ Google Ads</div>}
+      </div>
+      <button className="btn-blue" style={{width:"100%"}} onClick={generate} disabled={loading}>
+        {loading?<><span className="spin">◌</span> Gerando...</>:"✦ Gerar mensagem de CS"}
+      </button>
+    </div>
+    {msg&&<div className="fu" style={{background:C.s1,border:`1px solid ${C.line}`,borderRadius:14,padding:"22px 26px"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+        <div style={{fontSize:11,fontWeight:600,color:C.t1,letterSpacing:".04em"}}>MENSAGEM GERADA</div>
+        <button onClick={copy} style={{background:copied?C.greenDim:C.s2,border:`1px solid ${copied?C.green+"55":C.line}`,color:copied?C.green:C.t1,borderRadius:8,padding:"5px 14px",cursor:"pointer",fontSize:12,fontWeight:500}}>{copied?"✓ Copiado!":"Copiar"}</button>
+      </div>
+      <div style={{background:"#0d1117",borderRadius:12,padding:18,border:`1px solid ${C.line}`}}>
+        <div style={{background:"#1f2c34",borderRadius:"0 12px 12px 12px",padding:"12px 16px",maxWidth:"85%",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}>
+          <div style={{fontSize:13,color:"#e9edef",lineHeight:1.7,whiteSpace:"pre-wrap"}}>
+            {msg.split(/(\*[^*]+\*)/).map((part,i)=>part.startsWith("*")&&part.endsWith("*")?<strong key={i} style={{color:"#fff"}}>{part.slice(1,-1)}</strong>:part)}
+          </div>
+        </div>
+        <div style={{marginTop:5,fontSize:10,color:"#8696a0",paddingLeft:4}}>{new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})} ✓✓</div>
+      </div>
+      <button onClick={generate} style={{marginTop:10,background:"transparent",border:`1px solid ${C.line}`,color:C.t2,borderRadius:8,padding:"5px 14px",cursor:"pointer",fontSize:12}}>↺ Gerar outra versão</button>
+    </div>}
+  </div>;
+}
+
+/* ── DROP ZONE ── */
+function DropZone({label,sub,accept,onFile,done,color}){
+  const [over,setOver]=useState(false);
+  const ref=useRef();
+  return<label ref={ref} className={`drop-zone${over?" over":""}${done?" done":""}`} style={{padding:"28px 20px"}}
+    onDrop={e=>{e.preventDefault();setOver(false);const f=e.dataTransfer.files[0];if(f)onFile(f);}}
+    onDragOver={e=>{e.preventDefault();setOver(true);}}
+    onDragLeave={()=>setOver(false)}>
+    <input type="file" accept={accept} onChange={e=>onFile(e.target.files[0])}/>
+    <div style={{fontSize:22,marginBottom:8,color:done?color:"#3d5578"}}>{done?"✓":"↑"}</div>
+    <div style={{fontSize:13,color:done?color:C.t1,fontWeight:500,marginBottom:3}}>{done?"Carregado!":label}</div>
+    <div style={{fontSize:11,color:C.t2}}>{sub}</div>
+  </label>;
+}
+
+function SettingsModal({apiKey,onSave,onClose}){
+  const [val,setVal]=useState(apiKey);
+  return<div style={{position:"fixed",inset:0,background:"#00000088",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:24}} onClick={onClose}>
+    <div style={{background:C.s1,border:`1px solid ${C.line}`,borderRadius:14,padding:"26px 30px",maxWidth:440,width:"100%"}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:15,fontWeight:600,color:C.t0,marginBottom:4}}>Chave da API Anthropic</div>
+      <div style={{fontSize:12,color:C.t2,marginBottom:18,lineHeight:1.6}}>Necessária para gerar mensagens de CS.<br/>Obtenha em: <a href="https://console.anthropic.com" target="_blank" style={{color:C.blue}}>console.anthropic.com</a></div>
+      <input type="password" value={val} onChange={e=>setVal(e.target.value)} placeholder="sk-ant-..." className="txt-input" style={{marginBottom:14}}/>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={()=>onSave(val)} className="btn-blue" style={{flex:1}}>Salvar</button>
+        <button onClick={onClose} style={{background:C.s2,border:`1px solid ${C.line}`,color:C.t1,borderRadius:10,padding:"0 18px",cursor:"pointer",fontSize:14}}>Cancelar</button>
+      </div>
+      <div style={{fontSize:11,color:C.t3,marginTop:10}}>A chave fica na memória da sessão — apagada ao fechar a aba.</div>
+    </div>
+  </div>;
+}
+
+/* ── APP ── */
+function App(){
+  const [metaData,setMetaData]=useState(null);
+  const [googleData,setGoogleData]=useState(null);
+  const [clientName,setClientName]=useState("");
+  const [nicho,setNicho]=useState("");
+  const [tab,setTab]=useState("overview");
+  const [loading,setLoading]=useState({meta:false,google:false});
+  const [errors,setErrors]=useState({meta:"",google:""});
+  const [showSettings,setShowSettings]=useState(false);
+  const [apiKey,setApiKey]=useState(()=>sessionStorage.getItem("anthropic_key")||"");
+  const [funnelVisible,setFunnelVisible]=useState(false);
+
+  useEffect(()=>{if(tab==="overview"&&metaData){setTimeout(()=>setFunnelVisible(true),150);}else{setFunnelVisible(false);}},[tab,metaData]);
+
+  const handleMeta=useCallback(async file=>{
+    setLoading(l=>({...l,meta:true}));setErrors(e=>({...e,meta:""}));
+    try{const text=await file.text();const r=parseMetaCSV(text);if(!r)throw new Error("Nenhum dado com gasto encontrado.");setMetaData(r);setTab("overview");}
+    catch(e){setErrors(er=>({...er,meta:e.message}));}
+    setLoading(l=>({...l,meta:false}));
+  },[]);
+
+  const handleGoogle=useCallback(async file=>{
+    setLoading(l=>({...l,google:true}));setErrors(e=>({...e,google:""}));
+    try{const r=await parseGoogleZip(file);setGoogleData(r);setTab("overview");}
+    catch(e){setErrors(er=>({...er,google:e.message}));}
+    setLoading(l=>({...l,google:false}));
+  },[]);
+
+  const saveKey=key=>{sessionStorage.setItem("anthropic_key",key);setApiKey(key);setShowSettings(false);};
+  const reset=()=>{setMetaData(null);setGoogleData(null);setTab("overview");setErrors({meta:"",google:""});setConfirmed(false);setNicho("");};
+
+  const hasMeta=!!metaData,hasGoogle=!!googleData,hasAny=hasMeta||hasGoogle;
+  const [confirmed,setConfirmed]=useState(false);
+  const ms=metaData?.summary;
+
+  /* UPLOAD SCREEN */
+  if(!hasAny||!confirmed) return<div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,position:"relative"}}>
+    {showSettings&&<SettingsModal apiKey={apiKey} onSave={saveKey} onClose={()=>setShowSettings(false)}/>}
+    <button onClick={()=>setShowSettings(true)} style={{position:"absolute",top:20,right:20,background:C.s1,border:`1px solid ${C.line}`,color:apiKey?C.green:C.t2,borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:18}}>⚙</button>
+    <div style={{maxWidth:560,width:"100%"}}>
+      <div style={{textAlign:"center",marginBottom:36}}>
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:C.blue,letterSpacing:".2em",marginBottom:10}}>PERFORMANCE DASHBOARD</div>
+        <div style={{fontSize:28,fontWeight:700,color:C.t0,lineHeight:1.2}}>Meta Ads + Google Ads<br/><span style={{color:C.blue}}>visão unificada</span></div>
+        <div style={{fontSize:13,color:C.t2,marginTop:10}}>Suba um ou os dois — o dashboard se adapta</div>
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:11,color:C.t2,marginBottom:6}}>Nome do cliente</div>
+        <input type="text" placeholder="Ex: Dr. Ademir" value={clientName} onChange={e=>setClientName(e.target.value)} className="txt-input"/>
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:11,color:C.t2,marginBottom:6}}>Nicho / Segmento</div>
+        <select value={nicho} onChange={e=>setNicho(e.target.value)} style={{width:"100%",background:C.s1,border:`1px solid ${C.line}`,borderRadius:10,padding:"10px 14px",color:C.t0,fontSize:13,outline:"none",cursor:"pointer"}}>
+          <option value="">Selecione o nicho...</option>
+          <option value="moveis_planejados">Móveis Planejados</option>
+          <option value="vestuario">Vestuário / Moda</option>
+          <option value="atacado">Atacado</option>
+          <option value="saude_nutro">Saúde / Nutrologia / Medicina</option>
+          <option value="odontologia">Odontologia</option>
+          <option value="restaurante">Restaurante / Food</option>
+          <option value="farmacia">Farmácia de Manipulados</option>
+          <option value="seguros">Seguros / Consórcios</option>
+          <option value="ecommerce_moda">E-commerce Moda</option>
+          <option value="ecommerce_geral">E-commerce Geral</option>
+          <option value="acougue">Açougue / Carnes</option>
+          <option value="celulares">Celulares / Eletrônicos</option>
+          <option value="artesanato">Artesanato / Aviamentos</option>
+          <option value="generico">Outro / Geral</option>
+        </select>
+      </div>
+      {hasAny&&<button onClick={()=>setConfirmed(true)} style={{width:"100%",marginBottom:14,padding:"13px 0",borderRadius:10,cursor:"pointer",background:C.blue,border:"none",color:"#fff",fontSize:15,fontWeight:700,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+        Ir para o dashboard →
+      </button>}
+      <div style={{display:"flex",gap:12,marginBottom:8,flexWrap:"wrap"}}>
+        <div style={{flex:"1 1 220px",display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{fontSize:11,color:C.blue,letterSpacing:".06em",display:"flex",alignItems:"center",gap:6}}>
+            <span style={{width:8,height:8,borderRadius:"50%",background:C.blue,display:"inline-block"}}/>META ADS
+          </div>
+          {loading.meta?<div style={{padding:28,textAlign:"center",color:C.t2,border:`1px solid ${C.line}`,borderRadius:12}}><span className="spin">◌</span></div>:
+          <DropZone label="CSV do Meta Ads" sub="Gerenciador → Aba Anúncios → .CSV" accept=".csv" onFile={handleMeta} done={hasMeta} color={C.blue}/>}
+          {errors.meta&&<div style={{fontSize:11,color:C.red,padding:"6px 10px",background:C.redDim,borderRadius:8}}>⚠ {errors.meta}</div>}
+        </div>
+        <div style={{flex:"1 1 220px",display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{fontSize:11,color:C.gBlue,letterSpacing:".06em",display:"flex",alignItems:"center",gap:6}}>
+            <span style={{width:8,height:8,borderRadius:"50%",background:C.gBlue,display:"inline-block"}}/>GOOGLE ADS
+          </div>
+          {loading.google?<div style={{padding:28,textAlign:"center",color:C.t2,border:`1px solid ${C.line}`,borderRadius:12}}><span className="spin">◌</span></div>:
+          <DropZone label="ZIP do Google Ads" sub="Visão geral → Cards → Exportar CSV → .ZIP" accept=".zip" onFile={handleGoogle} done={hasGoogle} color={C.gBlue}/>}
+          {errors.google&&<div style={{fontSize:11,color:C.red,padding:"6px 10px",background:C.redDim,borderRadius:8}}>⚠ {errors.google}</div>}
+        </div>
+      </div>
+    </div>
+  </div>;
+
+  /* DASHBOARD */
+  const totalSpend=(ms?.spend||0)+(googleData?.spend||0);
+  const TABS=[
+    {id:"overview",label:"Visão Geral"},
+    ...(hasMeta?[{id:"meta",label:"Meta Ads"},{id:"ads",label:"Anúncios"}]:[]),
+    ...(hasGoogle?[{id:"google",label:"Google Ads"}]:[]),
+    {id:"msg",label:"✦ Mensagem CS"},
+  ];
+
+  return<div style={{minHeight:"100vh",background:C.bg,color:C.t0}}>
+    {showSettings&&<SettingsModal apiKey={apiKey} onSave={saveKey} onClose={()=>setShowSettings(false)}/>}
+    {/* NAV */}
+    <div style={{background:C.s1,borderBottom:`1px solid ${C.line}`,padding:"0 24px",height:54,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,position:"sticky",top:0,zIndex:100}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+        <div style={{display:"flex",gap:4}}>
+          {hasMeta&&<div style={{width:8,height:8,borderRadius:"50%",background:C.blue,boxShadow:`0 0 8px ${C.blue}`}}/>}
+          {hasGoogle&&<div style={{width:8,height:8,borderRadius:"50%",background:C.gBlue,boxShadow:`0 0 8px ${C.gBlue}`}}/>}
+        </div>
+        <span style={{fontSize:14,fontWeight:600,color:C.t0}}>Performance</span>
+        {clientName&&<span style={{fontSize:12,color:C.t2}}>· {clientName}</span>}
+        {hasMeta&&ms?.account_type&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:20,letterSpacing:".08em",background:ms.account_type==="ecommerce"?C.goldDim:C.blueDim,color:ms.account_type==="ecommerce"?C.gold:C.blue,border:`1px solid ${ms.account_type==="ecommerce"?C.gold+"44":C.blue+"44"}`}}>{ms.account_type==="ecommerce"?"E-COMMERCE":"MENSAGENS"}</span>}
+        {nicho&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:20,letterSpacing:".08em",background:C.s3,color:C.t2,border:`1px solid ${C.line}`}}>{(NICHO_BENCH[nicho]||NICHO_BENCH.generico).label.toUpperCase()}</span>}
+      </div>
+      <div style={{display:"flex",gap:3,background:C.bg,padding:4,borderRadius:10,border:`1px solid ${C.line}`,overflowX:"auto"}}>
+        {TABS.map(t=><button key={t.id} className={`tab ${tab===t.id?"on":""}`} onClick={()=>setTab(t.id)} style={t.id==="msg"?{color:tab==="msg"?C.green:C.gold}:{}}>{t.label}</button>)}
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={()=>setShowSettings(true)} style={{background:"transparent",border:`1px solid ${C.line}`,color:apiKey?C.green:C.t2,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:16}}>⚙</button>
+        <button onClick={reset} style={{background:C.s2,border:`1px solid ${C.line}`,color:C.t1,borderRadius:8,padding:"6px 14px",cursor:"pointer",fontSize:12}}>↑ Novo</button>
+      </div>
+    </div>
+
+    <div style={{padding:"22px 24px",maxWidth:1300,margin:"0 auto"}}>
+
+      {/* OVERVIEW */}
+      {tab==="overview"&&<div>
+        {/* Combined KPIs */}
+        <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}} className="fu">
+          <KCard i={0} label="Investimento total" value={brl(totalSpend)} accent={C.blue}/>
+          {hasMeta&&ms?.account_type==="ecommerce"&&<KCard i={1} label="Receita Total" value={brl(ms?.purchase_value)} sub={`${n0(ms?.purchases)} compras realizadas`} platform="meta" accent={C.green}/>}
+      {hasMeta&&ms?.account_type==="ecommerce"&&<KCard i={2} label="ROAS" value={ms?.roas?`${(+ms.roas).toFixed(2)}x`:"—"} sub={`CPP ${brl(ms?.cpp)}`} platform="meta" f={ms?.roas>=3?"ok":ms?.roas>=1.5?"warn":"bad"}/>}
+      {hasMeta&&ms?.account_type==="ecommerce"&&<KCard i={3} label="Checkout Rate" value={pct(ms?.checkout_rate)} sub="Carrinho → checkout" platform="meta" f={flag(ms?.checkout_rate,50)}/>}
+      {hasMeta&&ms?.account_type!=="ecommerce"&&<KCard i={1} label="Conversas Meta" value={n0(ms?.messages)} sub={`CPL ${brl(ms?.cpl)}`} platform="meta"/>}
+          {hasGoogle&&<KCard i={2} label="Conversões Google" value={n0(googleData?.conversions)} sub={`CPL ${brl(googleData?.cpl)}`} platform="google"/>}
+          {hasMeta&&<KCard i={3} label="CTR Meta" value={pct(ms?.ctr)} f={flag(ms?.ctr,BENCH.ctr)} platform="meta"/>}
+          {hasGoogle&&<KCard i={4} label="CTR Google" value={pct(googleData?.ctr)} f={flag(googleData?.ctr,BENCH.ctr)} platform="google"/>}
+        </div>
+
+        {/* Side by side panels */}
+        <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+          {hasMeta&&<div style={{flex:"1 1 300px",background:C.s1,border:`1px solid ${C.line}`,borderRadius:14,padding:"20px 22px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:C.blue,boxShadow:`0 0 6px ${C.blue}`}}/>
+              <span style={{fontSize:13,fontWeight:600,color:C.t1}}>Meta Ads — Funil</span>
+              <span style={{fontSize:11,color:C.blue,marginLeft:"auto"}}>{brl(ms?.spend)}</span>
+            </div>
+            <MetaFunnel s={ms} visible={funnelVisible} nicho={nicho}/>
+          </div>}
+          {hasGoogle&&<div style={{flex:"1 1 300px",background:C.s1,border:`1px solid ${C.line}`,borderRadius:14,padding:"20px 22px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:C.gBlue,boxShadow:`0 0 6px ${C.gBlue}`}}/>
+              <span style={{fontSize:13,fontWeight:600,color:C.t1}}>Google Ads</span>
+              <span style={{fontSize:11,color:C.gBlue,marginLeft:"auto"}}>{brl(googleData?.spend)}</span>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {[["Conversões",n0(googleData?.conversions),"CPL "+brl(googleData?.cpl)],["Cliques",n0(googleData?.clicks),"CPC "+brl(googleData?.cpc)],["Impressões",k(googleData?.impressions),"CPM "+brl(googleData?.cpm)],["CTR",pct(googleData?.ctr),null],["Mobile",pct(googleData?.mobilePct),"do investimento"]].filter(([,v])=>v&&v!=="—").map(([l,v,s])=>(
+                <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${C.line}22`}}>
+                  <div><div style={{fontSize:12,color:C.t1,fontWeight:500}}>{l}</div>{s&&<div style={{fontSize:10,color:C.t2,marginTop:2}}>{s}</div>}</div>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:18,fontWeight:600,color:C.t0}}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>}
+        </div>
+      </div>}
+
+      {tab==="meta"&&hasMeta&&<div className="fu">
+        <div style={{background:C.s1,border:`1px solid ${C.line}`,borderRadius:14,padding:"20px 22px",marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.t1,marginBottom:6}}>Pipeline de Conversão — Meta</div>
+          <div style={{fontSize:12,color:C.t2,marginBottom:20}}>
+            Estágio <span style={{color:C.red}}>Gargalo</span> = maior perda de leads · <span style={{color:C.t3}}>Clique nas taxas % para ver o benchmark</span>
+          </div>
+          <MetaFunnel s={ms} visible={true} nicho={nicho}/>
+        </div>
+        <div style={{background:C.s1,border:`1px solid ${C.line}`,borderRadius:14,padding:"20px 22px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+            <div style={{fontSize:13,fontWeight:600,color:C.t1}}>Métricas de Performance</div>
+            {nicho&&<div style={{fontSize:10,color:C.t2,background:C.s2,padding:"3px 10px",borderRadius:20,border:`1px solid ${C.line}`}}>Benchmark: {(NICHO_BENCH[nicho]||NICHO_BENCH.generico).label}</div>}
+          </div>
+          <div style={{fontSize:11,color:C.t2,marginBottom:20}}>Comparativo com benchmark do nicho — ▲▼ mostra distância do benchmark</div>
+          {(()=>{
+            const bench=getBench(nicho,ms?.account_type==="ecommerce");
+            const isEcom=ms?.account_type==="ecommerce";
+            const rows=isEcom?[
+              {l:"Hook Rate",    v:ms?.hook_rate,          bk:"hook",     d:"Parou no criativo — gancho do vídeo",         dir:"up",  fmt:pct},
+              {l:"Hold Rate",    v:ms?.hold_rate,          bk:"hold",     d:"Assistiu até o fim — qualidade do conteúdo",  dir:"up",  fmt:pct},
+              {l:"CTR",          v:ms?.ctr,                bk:"ctr",      d:"Clicou no anúncio — apelo da oferta",         dir:"up",  fmt:pct},
+              {l:"Connect Rate", v:ms?.connect_rate,       bk:"connect",  d:"Chegou na LP — perda entre clique e página",  dir:"up",  fmt:pct},
+              {l:"ATC Rate",     v:ms?.add_to_cart_rate,   bk:"atc",      d:"Clique → carrinho — interesse real no produto",dir:"up", fmt:pct},
+              {l:"Checkout Rate",v:ms?.checkout_rate,      bk:"checkout", d:"Carrinho → checkout — intenção de compra",    dir:"up",  fmt:pct},
+              {l:"CVR",          v:ms?.cvr,                bk:"cvr",      d:"Checkout → compra — conclusão da venda",      dir:"up",  fmt:pct},
+              {l:"ROAS",         v:ms?.roas,               bk:"roas",     d:"Retorno sobre investimento em publicidade",   dir:"up",  fmt:v=>`${(+v).toFixed(2)}x`},
+              {l:"Frequência",   v:ms?.frequency,          bk:"freq",     d:"Exposição média por pessoa — risco de saturação", dir:"down", fmt:v=>(+v).toFixed(2)},
+              {l:"CPM",          v:ms?.cpm,                bk:null,       d:"Custo por mil impressões",                    dir:"up",  fmt:brl},
+              {l:"CPC",          v:ms?.cpc,                bk:null,       d:"Custo por clique no link",                    dir:"up",  fmt:brl},
+              {l:"CPP",          v:ms?.cpp,                bk:null,       d:"Custo por compra",                            dir:"up",  fmt:brl},
+            ]:[
+              {l:"Hook Rate",    v:ms?.hook_rate,          bk:"hook",     d:"Parou no criativo — gancho do vídeo",         dir:"up",  fmt:pct},
+              {l:"Hold Rate",    v:ms?.hold_rate,          bk:"hold",     d:"Assistiu até o fim — qualidade do conteúdo",  dir:"up",  fmt:pct},
+              {l:"CTR",          v:ms?.ctr,                bk:"ctr",      d:"Clicou no anúncio — apelo da oferta",         dir:"up",  fmt:pct},
+              {l:"Connect Rate", v:ms?.connect_rate,       bk:"connect",  d:"Chegou na LP — perda entre clique e página",  dir:"up",  fmt:pct},
+              {l:"Lead Rate",    v:ms?.lead_rate,          bk:"lead_rate",d:"Clique virou conversa — eficiência do funil", dir:"up",  fmt:pct},
+              {l:"Frequência",   v:ms?.frequency,          bk:"freq",     d:"Exposição média por pessoa — risco de saturação", dir:"down", fmt:v=>(+v).toFixed(2)},
+              {l:"CPM",          v:ms?.cpm,                bk:null,       d:"Custo por mil impressões",                    dir:"up",  fmt:brl},
+              {l:"CPC",          v:ms?.cpc,                bk:null,       d:"Custo por clique no link",                    dir:"up",  fmt:brl},
+              {l:"CPL",          v:ms?.cpl,                bk:null,       d:"Custo por conversa iniciada",                 dir:"up",  fmt:brl},
+            ];
+            return rows.filter(r=>r.v!=null&&!isNaN(+r.v)&&+r.v>0).map(r=>{
+              const bVal=r.bk?bench[r.bk]:null;
+              const f=bVal?benchFlag(+r.v,bVal,r.dir):null;
+              const diff=bVal?benchDiff(+r.v,bVal,r.dir):null;
+              return(
+                <div key={r.l} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 0",borderBottom:`1px solid ${C.line}22`}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,color:C.t0,fontWeight:500}}>{r.l}</div>
+                    <div style={{fontSize:11,color:C.t2,marginTop:2}}>{r.d}</div>
+                  </div>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:22,fontWeight:700,color:f?FC[f]:C.t0,minWidth:90,textAlign:"right"}}>{r.fmt(r.v)}</div>
+                  <div style={{minWidth:90,textAlign:"right"}}>{f&&<Badge f={f}/>}</div>
+                  <div style={{minWidth:110,textAlign:"right",flexShrink:0}}>
+                    {bVal!=null&&<div>
+                      <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:C.t3}}>bench {r.bk==="roas"?`${bVal}x`:pct(bVal)}</div>
+                      {diff!=null&&<div style={{fontSize:11,fontWeight:600,color:f?FC[f]:C.t3,marginTop:1}}>{diff>0?`▲ +${diff.toFixed(0)}%`:`▼ ${diff.toFixed(0)}%`}</div>}
+                    </div>}
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      </div>}
+
+      {tab==="ads"&&hasMeta&&<div className="fu"><MetaAdsTable ads={metaData.ads} accountType={ms?.account_type}/></div>}
+      {tab==="google"&&hasGoogle&&<div className="fu"><GooglePanel g={googleData}/></div>}
+      {tab==="msg"&&<MsgTab meta={metaData} google={googleData} clientName={clientName} apiKey={apiKey}/>}
+    </div>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
