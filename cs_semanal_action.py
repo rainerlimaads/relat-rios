@@ -49,21 +49,111 @@ MAPA = {
 }
 
 ABERTURAS = {
-    "estetica":    "que seja de agenda cheia, clientes satisfeitos e novos procedimentos realizados",
-    "odontologia": "que seja de agenda cheia, pacientes satisfeitos e novos tratamentos iniciados",
-    "moveis":      "que seja de muito movimento, visitas qualificadas e novos projetos fechados",
-    "atacado":     "que seja de muito volume, boas negociacoes e pedidos crescendo",
-    "farmacia":    "que seja de muito atendimento, clientes fidelizados e vendas em alta",
-    "vestuario":   "que seja de muito movimento na loja, novos clientes e vendas crescendo",
-    "acougue":     "que seja de muito movimento, clientes satisfeitos e vendas em alta",
-    "joias":       "que seja de muito brilho, clientes encantados e vendas aquecidas",
-    "seguro":      "que seja de muito fechamento, retorno rapido e novos contratos",
-    "modulos":     "que seja de muito projeto, clientes realizados e novos contratos fechados",
-    "restaurante": "que seja de mesa cheia, clientes satisfeitos e movimento constante",
-    "otica":       "que seja de muito atendimento, clientes bem atendidos e vendas crescendo",
-    "artesanato":  "que seja de muita producao, clientes fieis e pedidos em alta",
-    "construcao":  "que seja de muito obra, clientes satisfeitos e novos contratos",
-    "default":     "que seja produtiva, com resultados crescentes e oportunidades aproveitadas",
+    "estetica": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, vamos nessa. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Antes de entrar no ritmo da semana, um olhar nos numeros da anterior. Relatorio de {ini} a {fim}."),
+        ("parceria", "Oi pessoal, tudo bem? Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio da semana {ini} a {fim} abaixo. Bora ver como foi."),
+        ("contexto", "Bom dia pessoal! Semana movimentada no digital — vamos ver o que os numeros mostram. Relatorio {ini} a {fim}."),
+    ],
+    "odontologia": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, agenda cheia. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Antes de comecar a semana, um olhar nos resultados da anterior. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para deixar o relatorio da semana {ini} a {fim} e alinhar os proximos passos."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Vamos ver como ficaram as oportunidades da semana."),
+        ("contexto", "Bom dia pessoal! Paciente decidido busca rapido — vamos ver o que a semana entregou. Relatorio {ini} a {fim}."),
+    ],
+    "moveis": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nNova semana, novos projetos. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Um olhar nos numeros antes de entrar no ritmo da semana. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados e o que vem por ai. Relatorio {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio da semana {ini} a {fim}. Vamos ver como ficaram as oportunidades."),
+        ("contexto", "Bom dia pessoal! Moveis planejados tem ciclo longo — cada oportunidade conta. Relatorio {ini} a {fim}."),
+    ],
+    "atacado": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, bora crescer o volume. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Antes de entrar no ritmo, um olhar nos numeros da semana passada. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Vamos ver como foi o volume de oportunidades."),
+        ("contexto", "Bom dia pessoal! No atacado volume e consistencia andam juntos — vamos ver os numeros. Relatorio {ini} a {fim}."),
+    ],
+    "farmacia": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, vamos nessa. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Um olhar nos resultados antes de comecar a semana. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os numeros da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Como ficaram as oportunidades da semana."),
+        ("contexto", "Bom dia pessoal! Retorno rapido faz diferenca na farmacia — vamos ver o que a semana entregou. Relatorio {ini} a {fim}."),
+    ],
+    "vestuario": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, bora movimentar. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Antes de entrar no ritmo da semana, um olhar nos numeros. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Vamos ver como ficou o movimento de oportunidades."),
+        ("contexto", "Bom dia pessoal! Moda tem sazonalidade — vamos ver o que a semana entregou. Relatorio {ini} a {fim}."),
+    ],
+    "acougue": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, bora manter o movimento. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Um olhar nos numeros antes de comecar a semana. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para deixar o relatorio da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Como ficaram as oportunidades da semana."),
+        ("contexto", "Bom dia pessoal! Cliente de acougue e fiel quando bem atendido — vamos ver o que a semana entregou. Relatorio {ini} a {fim}."),
+    ],
+    "joias": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, bora brilhar. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Antes de entrar no ritmo, um olhar nos numeros da semana passada. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Vamos ver como ficaram as oportunidades."),
+        ("contexto", "Bom dia pessoal! Joia tem decisao emocional — criativo e atendimento fazem toda a diferenca. Relatorio {ini} a {fim}."),
+    ],
+    "seguro": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, bora fechar. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Antes de comecar a semana, um olhar nos numeros da anterior. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Como ficaram as oportunidades da semana."),
+        ("contexto", "Bom dia pessoal! Seguro tem janela de decisao curta — cada hora conta no retorno. Relatorio {ini} a {fim}."),
+    ],
+    "modulos": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, novos projetos no horizonte. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Um olhar nos numeros antes de entrar no ritmo da semana. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Vamos ver como ficaram as oportunidades."),
+        ("contexto", "Bom dia pessoal! Modulos e paineis tem decisao tecnica — qualificar bem a oportunidade e o caminho. Relatorio {ini} a {fim}."),
+    ],
+    "restaurante": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, mesa cheia. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Antes de entrar no ritmo, um olhar nos numeros da semana passada. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Como ficou o movimento de oportunidades."),
+        ("contexto", "Bom dia pessoal! Restaurante e experiencia — cliente que vem uma vez volta se bem atendido. Relatorio {ini} a {fim}."),
+    ],
+    "otica": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, bora atender. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Antes de comecar a semana, um olhar nos numeros. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Como ficaram as oportunidades da semana."),
+        ("contexto", "Bom dia pessoal! Otica tem decisao rapida — retorno no primeiro contato define o agendamento. Relatorio {ini} a {fim}."),
+    ],
+    "artesanato": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, bora produzir. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Um olhar nos numeros antes de entrar no ritmo. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Como ficaram as oportunidades da semana."),
+        ("contexto", "Bom dia pessoal! Artesanato tem nicho fiel — cliente que gosta volta e indica. Relatorio {ini} a {fim}."),
+    ],
+    "construcao": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, novos contratos no horizonte. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Antes de entrar no ritmo da semana, um olhar nos numeros. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Como ficaram as oportunidades."),
+        ("contexto", "Bom dia pessoal! Construcao tem ciclo longo — cada oportunidade bem trabalhada vale muito. Relatorio {ini} a {fim}."),
+    ],
+    "default": [
+        ("energia", "Bom dia pessoal, tudo bom?\n\nSemana nova, vamos nessa. Segue o relatorio de {ini} a {fim}."),
+        ("foco", "Bom dia! Antes de comecar a semana, um olhar nos numeros da anterior. Relatorio {ini} a {fim}."),
+        ("parceria", "Oi pessoal! Passando para alinhar os resultados da semana {ini} a {fim}."),
+        ("direto", "Bom dia! Relatorio {ini} a {fim}. Vamos ver como ficaram os numeros."),
+        ("contexto", "Bom dia pessoal! Semana movimentada no digital — vamos ver o que os numeros mostram. Relatorio {ini} a {fim}."),
+    ],
 }
 
 PERGUNTAS = {
@@ -226,7 +316,12 @@ def extrair_cpl(ins):
 def gerar_mensagem(display, plat, nicho_key, saude, oportunidades,
                    cpl, meta_cpl, investimento, cliques, gargalo, ini, fim):
 
-    abertura = ABERTURAS.get(nicho_key, ABERTURAS["default"])
+    # Rotacao por semana — nunca repete o mesmo angulo 2 semanas seguidas
+    semana_num = datetime.now().isocalendar()[1]
+    opcoes = ABERTURAS.get(nicho_key, ABERTURAS["default"])
+    abertura_template = opcoes[semana_num % len(opcoes)][1]
+    abertura = abertura_template.format(ini=ini, fim=fim)
+
     pergunta = PERGUNTAS.get(nicho_key, PERGUNTAS["default"])
     passo = PROXIMOS.get(nicho_key, PROXIMOS["default"])
     passo_txt = passo["risco"] if saude in ["Em Risco", "Atencao"] else passo["ok"]
@@ -235,9 +330,7 @@ def gerar_mensagem(display, plat, nicho_key, saude, oportunidades,
     usa_google = plat in ["Google Ads", "Face + Google"]
 
     linhas = []
-    linhas.append("Bom dia pessoal, tudo bom?")
-    linhas.append("")
-    linhas.append("Iniciamos mais uma semana, {}. Segue o relatorio da semana {} a {}.".format(abertura, ini, fim))
+    linhas.append(abertura)
 
     if usa_meta:
         linhas.append("")
