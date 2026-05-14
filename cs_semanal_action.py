@@ -148,7 +148,11 @@ def periodo_semana():
 def get_clientes():
     url = "https://api.clickup.com/api/v2/list/{}/task".format(CLICKUP_LIST_ID)
     headers = {"Authorization": CLICKUP_TOKEN}
-    params = {"include_closed": "false", "limit": 100}
+    params = {
+        "include_closed": "false",
+        "limit": 100,
+        "statuses[]": "clientes ativos"
+    }
     resp = requests.get(url, headers=headers, params=params)
     resp.raise_for_status()
     return resp.json().get("tasks", [])
