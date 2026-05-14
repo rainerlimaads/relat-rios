@@ -1,0 +1,35 @@
+name: CS Semanal Automatizado
+
+on:
+  schedule:
+    - cron: '0 11 * * 1'  # Toda segunda 08h horario de Brasilia (UTC-3 = 11h UTC)
+  workflow_dispatch:       # Permite rodar manualmente pelo GitHub
+
+jobs:
+  cs-semanal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Rodar CS Semanal
+        env:
+          CLICKUP_TOKEN: ${{ secrets.CLICKUP_TOKEN }}
+          META_TOKEN: ${{ secrets.META_TOKEN }}
+        run: python cs_semanal_action.py
+
+      - name: Salvar output como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: cs-output-${{ github.run_id }}
+          path: output_cs.txt
+          retention-days: 7
