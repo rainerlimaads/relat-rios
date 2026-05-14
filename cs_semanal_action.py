@@ -430,5 +430,143 @@ if boleto:
 
 log("\nConcluido!")
 
+# Salva txt para artifact (fallback)
 with open("output_cs.txt", "w", encoding="utf-8") as f:
     f.write("\n".join(linhas_log))
+
+# Gera HTML para GitHub Pages — acessivel em rainerlimaads.github.io/relat-rios/cs.html
+import os
+os.makedirs("docs", exist_ok=True)
+
+def saude_cor(saude):
+    if saude == "Em Risco":
+        return "#e74c3c"
+    elif saude == "Atencao":
+        return "#f39c12"
+    return "#27ae60"
+
+cards_html = ""
+for m in mensagens:
+    cor = saude_cor(m["saude"])
+    msg_html = m["msg"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    msg_html = msg_html.replace("*", "<strong>", 1)
+    # bold simples: substitui *texto* por <strong>texto</strong>
+    import re
+    msg_formatada = re.sub(r'\*(.+?)\*', r'<strong>\1</strong>', m["msg"])
+    msg_formatada = msg_formatada.replace("\n", "<br>")
+
+    grupo_btn = ""
+    if m.get("link") and m["link"] not in ["https://web.whatsapp.com/", None, ""]:
+        grupo_btn = '<a href="{}" target="_blank" class="btn-grupo">Abrir grupo</a>'.format(m["link"])
+
+    cards_html += """
+    <div class="card">
+        <div class="card-header">
+            <span class="nome">{nome}</span>
+            <span class="badge" style="background:{cor}">{saude}</span>
+            {grupo_btn}
+        </div>
+        <div class="mensagem">{msg}</div>
+        <button class="btn-copy" onclick="copiar(this)">Copiar mensagem</button>
+        <textarea class="hidden-text">{msg_raw}</textarea>
+    </div>
+    """.format(
+        nome=m["nome"],
+        cor=cor,
+        saude=m["saude"],
+        grupo_btn=grupo_btn,
+        msg=msg_formatada,
+        msg_raw=m["msg"].replace("</", "<\\/")
+    )
+
+pix_html = ""
+if boleto:
+    pix_items = "".join(
+        "<li>{} — R${:.2f}</li>".format(b, PIX_SEMANAL) for b in boleto
+    )
+    pix_html = """
+    <div class="pix-section">
+        <h2>Pix Semanal — {data}</h2>
+        <ul>{items}</ul>
+        <p class="total">Total: R${total:.2f}</p>
+    </div>
+    """.format(
+        data=datetime.now().strftime("%d/%m/%Y"),
+        items=pix_items,
+        total=len(boleto) * PIX_SEMANAL
+    )
+
+html = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS Semanal {ini} a {fim}</title>
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; color: #1a1a1a; }}
+  h1 {{ font-size: 20px; font-weight: 700; margin-bottom: 6px; color: #1a1a1a; }}
+  .meta {{ font-size: 13px; color: #666; margin-bottom: 24px; }}
+  .resumo {{ background: #fff; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; display: flex; gap: 24px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
+  .resumo-item {{ font-size: 13px; color: #444; }}
+  .resumo-item strong {{ font-size: 22px; display: block; color: #1a1a1a; }}
+  .card {{ background: #fff; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
+  .card-header {{ display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }}
+  .nome {{ font-size: 15px; font-weight: 600; flex: 1; }}
+  .badge {{ font-size: 11px; font-weight: 600; color: #fff; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }}
+  .btn-grupo {{ font-size: 12px; color: #25d366; border: 1px solid #25d366; border-radius: 20px; padding: 3px 10px; text-decoration: none; white-space: nowrap; }}
+  .mensagem {{ font-size: 14px; line-height: 1.7; color: #333; background: #f8f9fa; border-radius: 8px; padding: 14px; margin-bottom: 12px; white-space: pre-wrap; }}
+  .btn-copy {{ font-size: 13px; background: #1a1a1a; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer; }}
+  .btn-copy:hover {{ background: #333; }}
+  .btn-copy.copiado {{ background: #27ae60; }}
+  .hidden-text {{ display: none; }}
+  .pix-section {{ background: #fff; border-radius: 12px; padding: 18px 20px; margin-top: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
+  .pix-section h2 {{ font-size: 16px; margin-bottom: 12px; }}
+  .pix-section ul {{ list-style: none; }}
+  .pix-section li {{ padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }}
+  .total {{ font-size: 16px; font-weight: 700; margin-top: 12px; }}
+  @media (max-width: 600px) {{ body {{ padding: 12px; }} }}
+</style>
+</head>
+<body>
+<h1>Relatorios de Performance</h1>
+<p class="meta">Semana {ini} a {fim} &nbsp;|&nbsp; Gerado em {gerado} &nbsp;|&nbsp; {total} clientes</p>
+<div class="resumo">
+  <div class="resumo-item"><strong>{n_meta}</strong>Dentro da Meta</div>
+  <div class="resumo-item"><strong style="color:#e74c3c">{n_risco}</strong>Em Risco / Atencao</div>
+  <div class="resumo-item"><strong>{n_pix}</strong>Pix a enviar</div>
+  <div class="resumo-item"><strong>R${total_pix:.0f}</strong>Total Pix</div>
+</div>
+{cards}
+{pix}
+<script>
+function copiar(btn) {{
+  var txt = btn.nextElementSibling.value;
+  navigator.clipboard.writeText(txt).then(function() {{
+    btn.textContent = 'Copiado!';
+    btn.classList.add('copiado');
+    setTimeout(function() {{
+      btn.textContent = 'Copiar mensagem';
+      btn.classList.remove('copiado');
+    }}, 2000);
+  }});
+}}
+</script>
+</body>
+</html>""".format(
+    ini=periodo_ini,
+    fim=periodo_fim,
+    gerado=datetime.now().strftime("%d/%m/%Y %H:%M"),
+    total=len(mensagens),
+    n_meta=len(dentro_meta),
+    n_risco=len(em_risco),
+    n_pix=len(boleto),
+    total_pix=len(boleto) * PIX_SEMANAL,
+    cards=cards_html,
+    pix=pix_html
+)
+
+with open("docs/cs.html", "w", encoding="utf-8") as f:
+    f.write(html)
+
+print("\nPagina gerada: https://rainerlimaads.github.io/relat-rios/cs.html")
