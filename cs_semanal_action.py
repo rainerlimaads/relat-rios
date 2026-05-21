@@ -328,22 +328,34 @@ def get_meta_todos_periodos(account_id):
     return ins_7d, ins_14d, ins_21d, ins_30d
 
 
+TIPOS_LEAD = [
+    "onsite_conversion.lead_grouped",          # lead form deduplucado
+    "onsite_conversion.messaging_conversation_started_7d",  # conversa WPP iniciada
+    "contact",                                 # clique em contato
+    "omni_complete_registration",              # cadastro
+    "schedule",                                # agendamento
+]
+# "lead" so entra se lead_grouped nao existir (evita dupla contagem)
+TIPOS_LEAD_FALLBACK = ["lead"]
+
+
 def extrair_leads(ins):
     if not ins:
         return 0
-    for a in ins.get("actions", []):
-        if a.get("action_type") in ["lead", "onsite_conversion.lead_grouped"]:
-            return int(a.get("value", 0))
-    return 0
+    actions = {a["action_type"]: int(a.get("value", 0))
+               for a in ins.get("actions", [])}
+    total = 0
+    for t in TIPOS_LEAD:
+        total += actions.get(t, 0)
+    # soma "lead" apenas se lead_grouped nao veio (evita dupla contagem)
+    if actions.get("onsite_conversion.lead_grouped", 0) == 0:
+        total += actions.get("lead", 0)
+    return total
 
 
 def extrair_cpl(ins):
     if not ins:
         return None
-    for a in ins.get("cost_per_action_type", []):
-        if a.get("action_type") in ["lead", "onsite_conversion.lead_grouped"]:
-            v = float(a.get("value", 0))
-            return round(v, 2) if v > 0 else None
     sp = float(ins.get("spend", 0))
     l = extrair_leads(ins)
     return round(sp / l, 2) if l > 0 else None
