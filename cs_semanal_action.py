@@ -56,11 +56,14 @@ MAPA = {
     "Ademir":                       "570493612230387",
     "Tendência Planejados":         "1451590226264346",
     "Tendências":                   "1451590226264346",
+    "Patricía":                     "1451590226264346",  # mesmo que Tendências
     "Torre Estruturas":             "956582003798132",
     "Torre Estrutura":              "956582003798132",  # cobre "Torre Estrutura metálica"
     # ── Novos clientes ─────────────────────────────────────────
     "Mercado da Semijoias":         "226229720209425",
+    "Rafael Breda":                 "226229720209425",  # mesmo que Mercado da Semijoias
     "Tulli":                        "1397248371252598",
+    "Denise":                       "1397248371252598",  # mesmo que Tulli
     "Limer Modulos":                "1713522899816834",
     "Paulo e Bruna":                "1713522899816834",  # mesmo que Limer Modulos
 }
