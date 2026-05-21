@@ -20,6 +20,9 @@ CAMPOS = {
     "meta_cpl":           "4149e4ca-b01f-426b-b6bd-16c9c4add0c3",
     "cpl_7d":             "5407a9f2-247d-461f-add3-ad0e1ff9dbf6",
     "leads_7d":           "ae4741ba-ed7b-422b-99e2-71dfb6b9599f",
+    "leads_14d":          "842ed666-ad6f-4999-821e-4a333f0fe605",
+    "leads_21d":          "a1419879-438f-4b9f-a62a-629833040343",
+    "leads_30d":          "45c4b282-23d3-479c-b29f-45c0194fec38",
     "pgto_ca":            "6644e4a1-e68c-4015-80dc-28f4d0785847",
     "link_grupo":         "99e9eded-f032-4554-b500-2df1a8b1ab02",
     "gargalo":            "ea72efed-ab12-4396-8c71-dcd7530b72e5",
@@ -271,15 +274,12 @@ def atualizar_campo(task_id, campo_id, valor):
         pass
 
 
-def get_meta(account_id):
-    hoje = datetime.now()
-    domingo = hoje - timedelta(days=hoje.weekday() + 1)
-    segunda = domingo - timedelta(days=6)
+def get_meta_periodo(account_id, inicio, fim):
     url = "https://graph.facebook.com/v19.0/act_{}/insights".format(account_id)
     params = {
         "access_token": META_TOKEN,
         "fields": "spend,actions,cost_per_action_type,clicks",
-        "time_range": json.dumps({"since": segunda.strftime("%Y-%m-%d"), "until": domingo.strftime("%Y-%m-%d")}),
+        "time_range": json.dumps({"since": inicio, "until": fim}),
         "level": "account"
     }
     try:
@@ -290,6 +290,24 @@ def get_meta(account_id):
         return d[0] if d else None
     except Exception:
         return None
+
+
+def get_meta_todos_periodos(account_id):
+    hoje = datetime.now()
+    domingo_s1 = hoje - timedelta(days=hoje.weekday() + 1)
+    segunda_s1 = domingo_s1 - timedelta(days=6)
+    domingo_s2 = segunda_s1 - timedelta(days=1)
+    segunda_s2 = domingo_s2 - timedelta(days=6)
+    domingo_s3 = segunda_s2 - timedelta(days=1)
+    segunda_s3 = domingo_s3 - timedelta(days=6)
+    domingo_s4 = segunda_s3 - timedelta(days=1)
+    segunda_s4 = domingo_s4 - timedelta(days=6)
+    fmt = "%Y-%m-%d"
+    ins_7d  = get_meta_periodo(account_id, segunda_s1.strftime(fmt), domingo_s1.strftime(fmt))
+    ins_14d = get_meta_periodo(account_id, segunda_s2.strftime(fmt), domingo_s2.strftime(fmt))
+    ins_21d = get_meta_periodo(account_id, segunda_s3.strftime(fmt), domingo_s3.strftime(fmt))
+    ins_30d = get_meta_periodo(account_id, segunda_s4.strftime(fmt), domingo_s4.strftime(fmt))
+    return ins_7d, ins_14d, ins_21d, ins_30d
 
 
 def extrair_leads(ins):
@@ -441,20 +459,49 @@ for t in tasks:
                 mapa_key = k
                 break
 
+    leads_14d = 0
+    leads_21d = 0
+    leads_30d = 0
+    cpl_medio_mensal = None
+
     if usa_meta and mapa_key:
-        ins = get_meta(MAPA[mapa_key])
-        if ins:
-            cpl_7d = extrair_cpl(ins)
-            leads_7d = extrair_leads(ins)
-            inv = round(float(ins.get("spend", 0)), 2)
-            cliques = int(ins.get("clicks", 0))
-            hoje_str = datetime.now().strftime("%Y-%m-%d")
+        ins7, ins14, ins21, ins30 = get_meta_todos_periodos(MAPA[mapa_key])
+        if ins7:
+            cpl_7d = extrair_cpl(ins7)
+            leads_7d = extrair_leads(ins7)
+            inv = round(float(ins7.get("spend", 0)), 2)
+            cliques = int(ins7.get("clicks", 0))
+        if ins14:
+            leads_14d = extrair_leads(ins14)
+        if ins21:
+            leads_21d = extrair_leads(ins21)
+        if ins30:
+            leads_30d = extrair_leads(ins30)
+
+        # Volume acumulado
+        vol_14d = leads_7d + leads_14d
+        vol_21d = vol_14d + leads_21d
+        vol_30d = vol_21d + leads_30d
+
+        # CPL medio mensal = investimento total / leads totais
+        inv_total = inv
+        for ins in [ins14, ins21, ins30]:
+            if ins:
+                inv_total += round(float(ins.get("spend", 0)), 2)
+        if vol_30d > 0:
+            cpl_medio_mensal = round(inv_total / vol_30d, 2)
+
+        hoje_str = datetime.now().strftime("%Y-%m-%d")
+        if ins7:
             if cpl_7d:
                 atualizar_campo(t["id"], CAMPOS["cpl_7d"], cpl_7d)
             atualizar_campo(t["id"], CAMPOS["leads_7d"], str(leads_7d))
+            atualizar_campo(t["id"], CAMPOS["leads_14d"], str(vol_14d))
+            atualizar_campo(t["id"], CAMPOS["leads_21d"], str(vol_21d))
+            atualizar_campo(t["id"], CAMPOS["leads_30d"], str(vol_30d))
             atualizar_campo(t["id"], CAMPOS["ultima_atualizacao"], hoje_str)
-            log("[OK] {}: {} oportunidades | R${} custo/oport | R${} investido".format(
-                nome, leads_7d, cpl_7d, inv))
+            log("[OK] {}: 7D={} | 14D={} | 21D={} | 30D={} | CPL-mes=R${} | R${} inv".format(
+                nome, leads_7d, vol_14d, vol_21d, vol_30d, cpl_medio_mensal, inv))
         else:
             log("[--] {}: sem dados Meta no periodo".format(nome))
     elif not usa_meta:
