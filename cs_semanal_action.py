@@ -45,6 +45,7 @@ MAPA = {
     "Grasielli e Amanda":           "957299715350643",
     "Stillo":                       "957299715350643",
     "Kaüe/Cristian":                "1092853728175420",
+    "Kaue/Cristian":                "1092853728175420",  # fallback sem acento
     "Athenas":                      "1092853728175420",
     "Jozi":                         "876814367940864",
     "Bom Boi":                      "876814367940864",
@@ -482,7 +483,11 @@ for t in tasks:
 
     mapa_key = None
     import unicodedata
-    def norm(s): return unicodedata.normalize("NFKD", s.lower())
+    def norm(s):
+        return ''.join(
+            c for c in unicodedata.normalize("NFKD", s.lower())
+            if not unicodedata.combining(c)
+        )
     if nome in MAPA:
         mapa_key = nome
     else:
