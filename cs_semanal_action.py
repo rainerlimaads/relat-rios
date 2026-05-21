@@ -34,21 +34,33 @@ CAMPOS = {
 }
 
 MAPA = {
+    # ── Clientes com nome original ──────────────────────────────
     "Juliana Couto":                "981821890966321",
     "Rogério":                      "1426016344887799",
-    "Jessíca Machado":              "2104277963310752",
     "Débora e Dilson":              "161254036978153",
+    "Mamuh Steakhouse":             "892974669033947",
+    # ── Nomes antigos mantidos + nomes novos do ClickUp ────────
+    "Jessíca Machado":              "2104277963310752",
+    "Istituto Lopes Machado":       "2104277963310752",
     "Grasielli e Amanda":           "957299715350643",
+    "Stillo":                       "957299715350643",
     "Kaüe/Cristian":                "1092853728175420",
+    "Athenas":                      "1092853728175420",
     "Jozi":                         "876814367940864",
+    "Bom Boi":                      "876814367940864",
     "Matheus":                      "987188046671152",
+    "Exclusive":                    "987188046671152",
     "Rafael Gentine - Limeira/SP":  "1269260778582752",
     "Rafael Gentine - Macapá/AP":   "352322129822164",
     "Rafael Gonzaga - Santarém/PR": "1226501099425856",
     "Ademir":                       "570493612230387",
     "Tendência Planejados":         "1451590226264346",
+    "Tendências":                   "1451590226264346",
     "Torre Estruturas":             "956582003798132",
-    "Mamuh Steakhouse":             "892974669033947",
+    # ── Novos clientes ─────────────────────────────────────────
+    "Mercado da Semijoias":         "226229720209425",
+    "Tulli":                        "1397248371252598",
+    "Limer Modulos":                "1713522899816834",
 }
 
 ABERTURAS = {
