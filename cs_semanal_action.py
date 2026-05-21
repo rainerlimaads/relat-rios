@@ -265,13 +265,14 @@ def get_campo(task, campo_id):
 
 
 def atualizar_campo(task_id, campo_id, valor):
-    url = "https://api.clickup.com/api/v2/task/{}".format(task_id)
+    url = "https://api.clickup.com/api/v2/task/{}/field/{}".format(task_id, campo_id)
     headers = {"Authorization": CLICKUP_TOKEN, "Content-Type": "application/json"}
-    payload = {"custom_fields": [{"id": campo_id, "value": valor}]}
+    payload = {"value": valor}
     try:
-        requests.put(url, headers=headers, json=payload)
+        r = requests.post(url, headers=headers, json=payload)
+        return r.status_code in [200, 201]
     except Exception:
-        pass
+        return False
 
 
 def get_meta_periodo(account_id, inicio, fim):
@@ -492,18 +493,20 @@ for t in tasks:
             cpl_medio_mensal = round(inv_total / vol_30d, 2)
 
         hoje_str = datetime.now().strftime("%Y-%m-%d")
+        # Grava sempre — mesmo que semanas anteriores nao tenham dados
+        if cpl_7d:
+            atualizar_campo(t["id"], CAMPOS["cpl_7d"], cpl_7d)
+        atualizar_campo(t["id"], CAMPOS["leads_7d"], str(int(leads_7d)))
+        atualizar_campo(t["id"], CAMPOS["leads_14d"], str(int(vol_14d)))
+        atualizar_campo(t["id"], CAMPOS["leads_21d"], str(int(vol_21d)))
+        atualizar_campo(t["id"], CAMPOS["leads_30d"], str(int(vol_30d)))
+        atualizar_campo(t["id"], CAMPOS["ultima_atualizacao"], hoje_str)
         if ins7:
-            if cpl_7d:
-                atualizar_campo(t["id"], CAMPOS["cpl_7d"], cpl_7d)
-            atualizar_campo(t["id"], CAMPOS["leads_7d"], str(leads_7d))
-            atualizar_campo(t["id"], CAMPOS["leads_14d"], str(vol_14d))
-            atualizar_campo(t["id"], CAMPOS["leads_21d"], str(vol_21d))
-            atualizar_campo(t["id"], CAMPOS["leads_30d"], str(vol_30d))
-            atualizar_campo(t["id"], CAMPOS["ultima_atualizacao"], hoje_str)
             log("[OK] {}: 7D={} | 14D={} | 21D={} | 30D={} | CPL-mes=R${} | R${} inv".format(
-                nome, leads_7d, vol_14d, vol_21d, vol_30d, cpl_medio_mensal, inv))
+                nome, int(leads_7d), vol_14d, vol_21d, vol_30d, cpl_medio_mensal, inv))
         else:
-            log("[--] {}: sem dados Meta no periodo".format(nome))
+            log("[--] {}: sem dados 7D | acumulado 14D={} 21D={} 30D={}".format(
+                nome, vol_14d, vol_21d, vol_30d))
     elif not usa_meta:
         log("[GA] {}: Google Ads".format(nome))
     else:
