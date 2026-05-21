@@ -479,7 +479,7 @@ for t in tasks:
             leads_30d = extrair_leads(ins30)
 
         # Volume acumulado
-        vol_14d = leads_7d + leads_14d
+        vol_14d = int(leads_7d) + leads_14d
         vol_21d = vol_14d + leads_21d
         vol_30d = vol_21d + leads_30d
 
