@@ -469,11 +469,13 @@ for t in tasks:
     cliques = 0
 
     mapa_key = None
+    import unicodedata
+    def norm(s): return unicodedata.normalize("NFKD", s.lower())
     if nome in MAPA:
         mapa_key = nome
     else:
         for k in MAPA:
-            if k.lower() in nome.lower() or nome.lower() in k.lower():
+            if norm(k) in norm(nome) or norm(nome) in norm(k):
                 mapa_key = k
                 break
 
@@ -509,7 +511,8 @@ for t in tasks:
         if vol_30d > 0:
             cpl_medio_mensal = round(inv_total / vol_30d, 2)
 
-        hoje_str = datetime.now().strftime("%Y-%m-%d")
+        import time
+        hoje_ts = int(time.time() * 1000)  # timestamp em ms para campo de data do ClickUp
         # Grava sempre — mesmo que semanas anteriores nao tenham dados
         if cpl_7d:
             atualizar_campo(t["id"], CAMPOS["cpl_7d"], cpl_7d)
@@ -517,7 +520,7 @@ for t in tasks:
         atualizar_campo(t["id"], CAMPOS["leads_14d"], str(int(vol_14d)))
         atualizar_campo(t["id"], CAMPOS["leads_21d"], str(int(vol_21d)))
         atualizar_campo(t["id"], CAMPOS["leads_30d"], str(int(vol_30d)))
-        atualizar_campo(t["id"], CAMPOS["ultima_atualizacao"], hoje_str)
+        atualizar_campo(t["id"], CAMPOS["ultima_atualizacao"], hoje_ts)
         if ins7:
             log("[OK] {}: 7D={} | 14D={} | 21D={} | 30D={} | CPL-mes=R${} | R${} inv".format(
                 nome, int(leads_7d), vol_14d, vol_21d, vol_30d, cpl_medio_mensal, inv))
