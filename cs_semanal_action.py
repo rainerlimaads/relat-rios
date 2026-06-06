@@ -339,39 +339,39 @@ def top_criativos(account_id, inicio, fim, limite=5):
         "fields": "ad_name,actions,cost_per_action_type,spend,impressions",
         "time_range": json.dumps({"since": inicio, "until": fim}),
         "level": "ad",
-        "sort": "spend_descending",
-        "limit": limite,
+        "limit": 25,
     }
     try:
-        r = requests.get(url, params=params, timeout=20)
+        r = requests.get(url, params=params, timeout=30)
         if r.status_code != 200:
+            log("[META] top_criativos status {} para conta {}".format(r.status_code, account_id))
             return []
         dados = r.json().get("data", [])
+        if not dados:
+            log("[META] top_criativos: sem dados para conta {} ({} a {})".format(account_id, inicio, fim))
+            return []
         resultado = []
         for d in dados:
             nome = d.get("ad_name", "?")
             spend = float(d.get("spend", 0) or 0)
             impr = int(d.get("impressions", 0) or 0)
-            # Extrair melhor metrica de resultado
             actions = d.get("actions", [])
             melhor_acao = ""
             melhor_qtd = 0
             for a in actions:
                 tipo = a.get("action_type", "")
-                qtd = int(a.get("value", 0) or 0)
+                qtd = int(float(a.get("value", 0) or 0))
                 if qtd > melhor_qtd:
                     melhor_qtd = qtd
                     melhor_acao = tipo
-            # CPL/custo por resultado
             cpa_list = d.get("cost_per_action_type", [])
             cpa = 0
             for c in cpa_list:
                 if c.get("action_type") == melhor_acao:
                     cpa = float(c.get("value", 0) or 0)
                     break
-            # Traduzir tipo de ação pra portugues simples
             tipo_label = {
-                "onsite_conversion.messaging_conversation_started_7d": "conversas iniciadas",
+                "onsite_conversion.messaging_conversation_started_7d": "conversas iniciadas no WhatsApp",
                 "lead": "leads",
                 "link_click": "cliques no link",
                 "landing_page_view": "visitas na pagina",
@@ -381,13 +381,17 @@ def top_criativos(account_id, inicio, fim, limite=5):
                 "comment": "comentarios",
                 "like": "curtidas",
                 "offsite_conversion.fb_pixel_lead": "leads (pixel)",
+                "profile_visit_view": "visitas ao perfil",
             }.get(melhor_acao, melhor_acao.replace("_", " ") if melhor_acao else "interacoes")
             if melhor_qtd > 0:
                 resultado.append({
                     "nome": nome, "resultados": melhor_qtd, "tipo": tipo_label,
                     "cpr": cpa, "gasto": spend, "impressoes": impr,
                 })
-        return resultado
+        # Ordena por resultados desc e retorna top N
+        resultado.sort(key=lambda x: x["resultados"], reverse=True)
+        log("[META] top_criativos: {} ads encontrados para conta {}".format(len(resultado), account_id))
+        return resultado[:limite]
     except Exception as e:
         log("[META] erro top_criativos: {}".format(e))
         return []
@@ -719,11 +723,19 @@ def gerar_relatorio_ia(ctx, dossie):
         "6. PERGUNTA DE ENGAJAMENTO: pergunte sobre a qualidade dos contatos, o retorno comercial, "
         "ou algo relevante ao negocio.\n\n"
         "REGRAS EXTRAS:\n"
-        "- Se a plataforma for 'Face + Google' e o Meta tiver poucos leads, pode ser porque Meta faz "
-        "conteudo/branding e Google faz lead gen. Explique isso naturalmente.\n"
+        "- TIPO DE CONVERSAO: olhe o tipo nos TOP CRIATIVOS (conversas iniciadas no WhatsApp, "
+        "visitas ao perfil, leads, cliques, etc). Use EXATAMENTE esse termo, nao generalize. "
+        "Se sao 'visitas ao perfil', NAO diga 'contatos' ou 'leads'. Se sao 'conversas iniciadas', "
+        "diga 'conversas no WhatsApp'. Nunca troque o tipo.\n"
+        "- PLATAFORMA MISTA (Face + Google): quando a plataforma for 'Face + Google', o Meta pode "
+        "ser usado so pra conteudo, branding e reconhecimento, enquanto o Google Ads gera os leads "
+        "reais (ligacoes, formularios). Leia o dossie pra entender qual e o papel de cada plataforma. "
+        "Se os leads no Meta forem baixos pra um cliente Face+Google, explique que o Meta faz o "
+        "trabalho de marca e o Google traz os contatos, nao apresente como performance ruim.\n"
         "- Use emojis pra separar secoes (tipo o exemplo). No maximo 4-5 emojis no total.\n"
         "- Tamanho: medio (8-15 linhas). Nem curto demais, nem texto enorme.\n"
         "- NUNCA invente dados. Se nao tem criativo, nao cite. Se nao tem CPL, diga.\n"
+        "- Se recebeu TOP CRIATIVOS nos dados, e OBRIGATORIO citar pelo menos o top 1 com nome e numeros.\n"
         "- Fale como o gestor de trafego que esta no detalhe, nao como um relatorio automatico."
     )
     return _chamar_ia(sistema, _montar_usuario(ctx, dossie))
