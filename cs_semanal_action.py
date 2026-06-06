@@ -512,50 +512,13 @@ def achar_dossie(display, dossies):
     return ""
 
 
-def gerar_relatorio_ia(ctx, dossie):
-    """Gera o relatorio semanal do cliente via Claude, no tom do dossie. Retorna '' se falhar."""
+def _chamar_ia(sistema, usuario, max_tokens=700):
+    """Chamada generica a Claude. Retorna texto ou ''."""
     if not ANTHROPIC_API_KEY:
         return ""
-    sistema = (
-        "Voce e o gestor de trafego da DD Mkt escrevendo o relatorio semanal de um cliente, "
-        "para enviar no WhatsApp. Escreva SO a mensagem, pronta pra colar, em portugues do Brasil.\n"
-        "Regras:\n"
-        "1. Adapte o TOM ao perfil do cliente descrito no dossie (tom preferido, comportamento).\n"
-        "2. Comece pelo resultado, em linguagem de empresario, sem jargao de trafego.\n"
-        "3. Se o custo por lead esta acima da meta, explique sem assustar e diga a ACAO que voce "
-        "vai tomar, usando o gargalo e a observacao da semana.\n"
-        "4. VARIE a abertura e a estrutura. Nao pode parecer a mensagem da semana passada. Sem formula fixa.\n"
-        "5. Cite especificidade real (criativo, dia, horario) apenas se vier nos dados ou na observacao. "
-        "Nunca invente numero.\n"
-        "6. NUNCA prometa resultado futuro.\n"
-        "7. Termine com um proximo passo claro ou uma pergunta leve de engajamento.\n"
-        "Tamanho: curto para perfis diretos, um pouco mais para consultivos. No maximo 1-2 emojis, "
-        "e so se combinar com o cliente."
-    )
-    usuario = (
-        "DADOS DA SEMANA ({ini} a {fim}):\n"
-        "- Cliente: {cliente}\n"
-        "- Nicho: {nicho}\n"
-        "- Plataforma: {plat}\n"
-        "- Fase da campanha: {fase}\n"
-        "- Gargalo identificado: {gargalo}\n"
-        "- Observacao da semana: {obs}\n"
-        "- Leads na semana: {leads}\n"
-        "- Custo por lead: {cpl}  |  Meta: {meta}\n\n"
-        "DOSSIE DO CLIENTE (perfil, tom, comportamento, historico):\n{dossie}"
-    ).format(
-        ini=ctx.get("ini", ""), fim=ctx.get("fim", ""),
-        cliente=ctx.get("cliente", ""), nicho=ctx.get("nicho", "") or "nao informado",
-        plat=ctx.get("plat", "") or "nao informado", fase=ctx.get("fase", "") or "nao informada",
-        gargalo=ctx.get("gargalo", "") or "Nenhum", obs=ctx.get("obs", "") or "(sem observacao)",
-        leads=ctx.get("leads", 0),
-        cpl=("R$%.2f" % ctx["cpl"]) if ctx.get("cpl") else "sem dado de Meta nesta semana",
-        meta=("R$%.2f" % ctx["meta"]) if ctx.get("meta") else "nao definida",
-        dossie=(dossie or "Sem dossie. Use o nicho para definir o tom.")[:4500],
-    )
     body = {
         "model": IA_MODEL,
-        "max_tokens": 700,
+        "max_tokens": max_tokens,
         "system": sistema,
         "messages": [{"role": "user", "content": usuario}],
     }
@@ -572,8 +535,153 @@ def gerar_relatorio_ia(ctx, dossie):
         partes = [b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text"]
         return "\n".join(partes).strip()
     except Exception as e:
-        log("[IA] excecao na chamada: {}".format(e))
+        log("[IA] excecao: {}".format(e))
         return ""
+
+
+REGRA_FORMATACAO = (
+    "REGRA DE FORMATACAO OBRIGATORIA: nunca use travessao longo ou em-dash (caractere '\\u2014'). "
+    "Use virgula, ponto, dois-pontos ou a palavra 'e' no lugar. "
+    "Nunca use asteriscos para negrito (**texto**). Escreva texto corrido simples."
+)
+
+REGRA_BASE = (
+    "Voce e o gestor de trafego da DD Mkt. Escreva SO a mensagem, pronta pra colar no WhatsApp, "
+    "em portugues do Brasil. Adapte o TOM ao perfil do cliente descrito no dossie. "
+    "VARIE a abertura e a estrutura toda semana. No maximo 1-2 emojis, e so se combinar. "
+    + REGRA_FORMATACAO
+)
+
+
+def semana_do_mes():
+    """Retorna 1, 2, 3 ou 4 baseado no dia do mes."""
+    dia = datetime.now().day
+    if dia <= 7:
+        return 1
+    elif dia <= 14:
+        return 2
+    elif dia <= 21:
+        return 3
+    return 4
+
+
+ACOES_ROTATIVAS = {
+    1: {
+        "nome": "Engajar Instagram dos clientes",
+        "instrucao": (
+            "Gere uma orientacao curta para a pessoa de CS engajar o Instagram do cliente. "
+            "Ex: curtir os 3 ultimos posts, comentar algo relevante, compartilhar no stories. "
+            "Use o dossie pra saber o @ e o estilo do cliente. "
+            "Se nao souber o @, oriente a pessoa de CS a procurar."
+        ),
+    },
+    2: {
+        "nome": "Insight de mercado do nicho",
+        "instrucao": (
+            "Gere uma mensagem curta com um insight de mercado relevante pro nicho do cliente. "
+            "Pode ser uma tendencia, um dado, uma oportunidade que ele deveria conhecer. "
+            "Tom consultivo, mostrando autoridade. A mensagem e pra enviar no grupo do cliente."
+        ),
+    },
+    3: {
+        "nome": "Disparar pesquisa NPS",
+        "instrucao": (
+            "Gere a mensagem de NPS pra enviar no grupo do cliente. Pergunte: "
+            "'De 0 a 10, qual a chance de voce recomendar nosso trabalho pra alguem?' "
+            "Adapte o tom ao perfil do cliente. Leve, sem pressao."
+        ),
+    },
+    4: {
+        "nome": "Relatorio mensal consolidado",
+        "instrucao": (
+            "Gere um resumo do mes do cliente: evolucao das ultimas 4 semanas, "
+            "o que funcionou, o que ajustamos, e o plano pro proximo mes. "
+            "Use os dados da semana como referencia (sao os mais recentes). "
+            "Tom de fechamento de ciclo, positivo mas realista."
+        ),
+    },
+}
+
+
+def _montar_usuario(ctx, dossie, extra=""):
+    """Monta o bloco de contexto do usuario pra qualquer prompt."""
+    return (
+        "DADOS ({ini} a {fim}):\n"
+        "- Cliente: {cliente}\n"
+        "- Nicho: {nicho}\n"
+        "- Plataforma: {plat}\n"
+        "- Fase: {fase}\n"
+        "- Gargalo: {gargalo}\n"
+        "- Obs semana: {obs}\n"
+        "- Leads: {leads} | CPL: {cpl} | Meta: {meta}\n\n"
+        "{extra}"
+        "DOSSIE DO CLIENTE:\n{dossie}"
+    ).format(
+        ini=ctx.get("ini", ""), fim=ctx.get("fim", ""),
+        cliente=ctx.get("cliente", ""), nicho=ctx.get("nicho", "") or "nao informado",
+        plat=ctx.get("plat", "") or "nao informado", fase=ctx.get("fase", "") or "nao informada",
+        gargalo=ctx.get("gargalo", "") or "Nenhum", obs=ctx.get("obs", "") or "(sem obs)",
+        leads=ctx.get("leads", 0),
+        cpl=("R$%.2f" % ctx["cpl"]) if ctx.get("cpl") else "sem dado",
+        meta=("R$%.2f" % ctx["meta"]) if ctx.get("meta") else "nao definida",
+        extra=(extra + "\n\n") if extra else "",
+        dossie=(dossie or "Sem dossie. Use o nicho para definir o tom.")[:4500],
+    )
+
+
+def gerar_relatorio_ia(ctx, dossie):
+    """TERCA: relatorio de performance no tom do dossie."""
+    sistema = (
+        REGRA_BASE + "\n"
+        "Esta e a mensagem de TERCA: relatorio de performance semanal.\n"
+        "1. Comece pelo resultado, linguagem de empresario, sem jargao.\n"
+        "2. Se CPL acima da meta, explique sem assustar e diga a ACAO usando gargalo/obs.\n"
+        "3. Cite dados reais (criativo, dia, horario) so se estiverem nos dados. Nunca invente.\n"
+        "4. NUNCA prometa resultado futuro.\n"
+        "5. Termine com proximo passo ou pergunta leve.\n"
+        "Tamanho: curto pra perfis diretos, mais detalhado pra consultivos."
+    )
+    return _chamar_ia(sistema, _montar_usuario(ctx, dossie))
+
+
+def gerar_abertura_ia(ctx, dossie):
+    """SEGUNDA: mensagem de abertura motivacional, sem numeros."""
+    sistema = (
+        REGRA_BASE + "\n"
+        "Esta e a mensagem de SEGUNDA: abertura da semana.\n"
+        "1. Motivacional, leve, humana. SEM numeros, SEM dados de performance.\n"
+        "2. Pode mencionar algo do negocio do cliente (baseado no dossie) pra mostrar proximidade.\n"
+        "3. Curta: 2-4 frases no maximo.\n"
+        "4. Termine com energia positiva ou uma frase que mostre que voce esta ligado no negocio dele.\n"
+        "5. NÃO mencione 'relatorio', 'dados', 'CPL', 'leads' ou qualquer metrica."
+    )
+    return _chamar_ia(sistema, _montar_usuario(ctx, dossie), max_tokens=300)
+
+
+def gerar_fechamento_ia(ctx, dossie):
+    """SEXTA: fechamento qualitativo, sem numeros, relacional."""
+    sistema = (
+        REGRA_BASE + "\n"
+        "Esta e a mensagem de SEXTA: fechamento da semana.\n"
+        "1. Qualitativa, relacional. SEM numeros, SEM dados de performance.\n"
+        "2. Pergunte como foi a semana do lado DELES (vendas, movimento, feedback dos clientes).\n"
+        "3. Mostre que voce esta presente e pensando no negocio.\n"
+        "4. Curta: 2-4 frases.\n"
+        "5. Tom de parceiro que se importa, nao de prestador de servico.\n"
+        "6. NÃO repita a estrutura da mensagem de segunda. Varie."
+    )
+    return _chamar_ia(sistema, _montar_usuario(ctx, dossie), max_tokens=300)
+
+
+def gerar_acao_rotativa(ctx, dossie, semana):
+    """Gera a orientacao da acao rotativa da semana (1-4)."""
+    acao = ACOES_ROTATIVAS.get(semana, ACOES_ROTATIVAS[1])
+    sistema = (
+        REGRA_BASE + "\n"
+        "ACAO ROTATIVA DA SEMANA {}: {}\n".format(semana, acao["nome"]) +
+        acao["instrucao"]
+    )
+    return _chamar_ia(sistema, _montar_usuario(ctx, dossie), max_tokens=400)
 
 
 periodo_ini, periodo_fim = periodo_semana()
@@ -727,8 +835,12 @@ for t in tasks:
 
     pix_status = "pago" if status_fin == "Pago" else "pendente"
 
-    # --- RELATORIO IA ---
+    # --- MENSAGENS IA (3 dias + acao rotativa) ---
     relatorio_ia = ""
+    abertura_ia = ""
+    fechamento_ia = ""
+    acao_ia = ""
+    SEMANA_MES = semana_do_mes()
     if not conta_parada and ANTHROPIC_API_KEY:
         ctx_ia = {
             "ini": periodo_ini, "fim": periodo_fim,
@@ -739,11 +851,16 @@ for t in tasks:
             "cpl": c7, "meta": mc,
         }
         dossie_txt = achar_dossie(display, DOSSIES)
+        # Segunda: abertura motivacional
+        abertura_ia = gerar_abertura_ia(ctx_ia, dossie_txt)
+        # Terca: relatorio de performance
         relatorio_ia = gerar_relatorio_ia(ctx_ia, dossie_txt)
-        if relatorio_ia:
-            log("[IA] relatorio gerado para {}".format(display))
-        else:
-            log("[IA] sem relatorio para {} (fallback JS)".format(display))
+        # Sexta: fechamento qualitativo
+        fechamento_ia = gerar_fechamento_ia(ctx_ia, dossie_txt)
+        # Acao rotativa da semana
+        acao_ia = gerar_acao_rotativa(ctx_ia, dossie_txt, SEMANA_MES)
+        gerados = sum(1 for x in [abertura_ia, relatorio_ia, fechamento_ia, acao_ia] if x)
+        log("[IA] {} - {}/4 mensagens geradas".format(display, gerados))
 
     mensagens.append({
         "nome": display, "saude": saude, "link": link, "msg": msg,
@@ -752,6 +869,9 @@ for t in tasks:
         "pix_valor": orcamento or "", "pix_status": pix_status,
         "conta_status": "parada" if conta_parada else "ativa",
         "relatorio_ia": relatorio_ia,
+        "abertura_ia": abertura_ia,
+        "fechamento_ia": fechamento_ia,
+        "acao_ia": acao_ia,
     })
 
 # ---- RESUMO ----
@@ -947,11 +1067,23 @@ with open("docs/cs-dados.csv", "w", encoding="utf-8", newline="") as f:
         ])
 print("CSV do painel gerado: docs/cs-dados.csv")
 
-# --- JSON com relatorios IA (para o painel) ---
-relatorios_ia = {}
+# --- JSON com mensagens IA completas (3 dias + acao rotativa) ---
+SEMANA_MES = semana_do_mes()
+ACAO_NOME = ACOES_ROTATIVAS.get(SEMANA_MES, ACOES_ROTATIVAS[1])["nome"]
+relatorios_ia = {"_meta": {"semana": SEMANA_MES, "acao_rotativa": ACAO_NOME, "periodo": "{} a {}".format(periodo_ini, periodo_fim)}}
 for m in mensagens:
+    dados_cliente = {}
+    if m.get("abertura_ia"):
+        dados_cliente["segunda"] = m["abertura_ia"]
     if m.get("relatorio_ia"):
-        relatorios_ia[m["nome"]] = m["relatorio_ia"]
+        dados_cliente["terca"] = m["relatorio_ia"]
+    if m.get("fechamento_ia"):
+        dados_cliente["sexta"] = m["fechamento_ia"]
+    if m.get("acao_ia"):
+        dados_cliente["acao_rotativa"] = m["acao_ia"]
+    if dados_cliente:
+        relatorios_ia[m["nome"]] = dados_cliente
 with open("docs/cs-relatorios.json", "w", encoding="utf-8") as f:
     json.dump(relatorios_ia, f, ensure_ascii=False, indent=1)
-print("JSON de relatorios IA gerado: docs/cs-relatorios.json ({} clientes)".format(len(relatorios_ia)))
+clientes_com_ia = len([k for k in relatorios_ia if k != "_meta"])
+print("JSON de relatorios IA gerado: docs/cs-relatorios.json ({} clientes, semana {}, ~{} chamadas IA)".format(clientes_com_ia, SEMANA_MES, clientes_com_ia * 4))
