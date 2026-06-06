@@ -154,6 +154,10 @@ function badge(st){
 
 /* Gera a mensagem de relatório — tom e estrutura variam por status */
 function gerarRelatorio(c){
+  // Prioridade: relatorio gerado pela IA (vem do motor semanal)
+  if(window.RELATORIOS_IA && window.RELATORIOS_IA[c.nome]){
+    return window.RELATORIOS_IA[c.nome];
+  }
   const {nome, leads, cpl, meta, criativo} = c;
   const per = CONFIG.PERIODO;
   const oport = leads === 1 ? "1 oportunidade" : `${leads} oportunidades`;
@@ -351,6 +355,12 @@ async function boot(){
       rows=SAMPLE.map(r=>r.slice());
       document.getElementById("note").textContent="Mostrando dados de EXEMPLO. Configure SHEET_CSV_URL no código para puxar dados reais da sua planilha.";
     }
+    // Carrega relatorios gerados pela IA (se existir)
+    try{
+      const rr=await fetch("cs-relatorios.json",{cache:"no-store"});
+      if(rr.ok) window.RELATORIOS_IA=await rr.json();
+      else window.RELATORIOS_IA={};
+    }catch(e){ window.RELATORIOS_IA={}; }
     CLIENTES=toClientes(rows);
     updateStats(); render();
   }catch(err){
