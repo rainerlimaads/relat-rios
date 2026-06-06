@@ -2,7 +2,7 @@ name: CS Semanal Automatizado
 
 on:
   schedule:
-    - cron: '0 11 * * 1'  # Segunda 08h Brasilia (UTC-3)
+    - cron: '0 11 * * 1'
   workflow_dispatch:
 
 jobs:
@@ -25,10 +25,9 @@ jobs:
 
       - name: Rodar CS Semanal
         env:
-          env:
-        CLICKUP_TOKEN: ${{ secrets.CLICKUP_TOKEN }}
-        META_TOKEN: ${{ secrets.META_TOKEN }}
-        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLICKUP_TOKEN: ${{ secrets.CLICKUP_TOKEN }}
+          META_TOKEN: ${{ secrets.META_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python cs_semanal_action.py
 
       - name: Publicar pagina no GitHub Pages
