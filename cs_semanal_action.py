@@ -3,11 +3,15 @@ import requests
 import json
 import os
 import sys
+import unicodedata
 from datetime import datetime, timedelta
 
 CLICKUP_TOKEN = os.environ.get("CLICKUP_TOKEN", "")
 META_TOKEN = os.environ.get("META_TOKEN", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 CLICKUP_LIST_ID = "901325426193"
+BASE_INTELIGENCIA_LIST_ID = "901327293866"
+IA_MODEL = "claude-sonnet-4-6"
 PIX_SEMANAL = 300.0
 
 if not CLICKUP_TOKEN or not META_TOKEN:
@@ -32,6 +36,7 @@ CAMPOS = {
     "fase_campanha":      "592b5368-2199-4201-9de5-8c4544ec1e35",
     "orcamento_midia":    "ea84ccdd-414f-475d-81f3-51a45b6252f9",
     "status_financeiro":  "4712f853-fdf7-4ad1-8882-3c1fca98818e",
+    "obs_semana":         "d0b56406-5562-46ae-a2b7-6a8f915b6895",
 }
 
 MAPA = {
@@ -456,6 +461,121 @@ def log(txt=""):
     print(txt)
     linhas_log.append(txt)
 
+def _norm(s):
+    """Normaliza nome pra casar cliente operacional com card da Base de Inteligencia."""
+    s = (s or "").replace("\U0001f9e0", " ").lower()
+    s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+    out = []
+    for ch in s:
+        out.append(ch if (ch.isalnum() or ch == " ") else " ")
+    return " ".join("".join(out).split())
+
+
+def carregar_dossies():
+    """Le os cards da Base de Inteligencia e devolve {nome_normalizado: texto_do_dossie}."""
+    dossies = {}
+    if not CLICKUP_TOKEN:
+        return dossies
+    url = "https://api.clickup.com/api/v2/list/{}/task".format(BASE_INTELIGENCIA_LIST_ID)
+    headers = {"Authorization": CLICKUP_TOKEN}
+    try:
+        r = requests.get(url, headers=headers, params={"include_closed": "true"}, timeout=30)
+        if r.status_code != 200:
+            log("[IA] nao consegui ler a Base de Inteligencia: {}".format(r.status_code))
+            return dossies
+        for t in r.json().get("tasks", []):
+            nome = t.get("name", "")
+            if "TEMPLATE" in nome.upper():
+                continue
+            texto = (t.get("text_content") or t.get("description") or "").strip()
+            if texto:
+                dossies[_norm(nome)] = texto
+        log("[IA] dossies carregados: {}".format(len(dossies)))
+    except Exception as e:
+        log("[IA] erro lendo Base de Inteligencia: {}".format(e))
+    return dossies
+
+
+def achar_dossie(display, dossies):
+    """Casa o cliente operacional com o card dele na Base de Inteligencia."""
+    alvo = _norm(display)
+    if not alvo:
+        return ""
+    for chave, texto in dossies.items():
+        if alvo in chave or chave in alvo:
+            return texto
+    # tentativa por palavras significativas (ignora nomes de pessoa antes do travessao)
+    palavras = [p for p in alvo.split() if len(p) > 3]
+    for chave, texto in dossies.items():
+        if palavras and all(p in chave for p in palavras):
+            return texto
+    return ""
+
+
+def gerar_relatorio_ia(ctx, dossie):
+    """Gera o relatorio semanal do cliente via Claude, no tom do dossie. Retorna '' se falhar."""
+    if not ANTHROPIC_API_KEY:
+        return ""
+    sistema = (
+        "Voce e o gestor de trafego da DD Mkt escrevendo o relatorio semanal de um cliente, "
+        "para enviar no WhatsApp. Escreva SO a mensagem, pronta pra colar, em portugues do Brasil.\n"
+        "Regras:\n"
+        "1. Adapte o TOM ao perfil do cliente descrito no dossie (tom preferido, comportamento).\n"
+        "2. Comece pelo resultado, em linguagem de empresario, sem jargao de trafego.\n"
+        "3. Se o custo por lead esta acima da meta, explique sem assustar e diga a ACAO que voce "
+        "vai tomar, usando o gargalo e a observacao da semana.\n"
+        "4. VARIE a abertura e a estrutura. Nao pode parecer a mensagem da semana passada. Sem formula fixa.\n"
+        "5. Cite especificidade real (criativo, dia, horario) apenas se vier nos dados ou na observacao. "
+        "Nunca invente numero.\n"
+        "6. NUNCA prometa resultado futuro.\n"
+        "7. Termine com um proximo passo claro ou uma pergunta leve de engajamento.\n"
+        "Tamanho: curto para perfis diretos, um pouco mais para consultivos. No maximo 1-2 emojis, "
+        "e so se combinar com o cliente."
+    )
+    usuario = (
+        "DADOS DA SEMANA ({ini} a {fim}):\n"
+        "- Cliente: {cliente}\n"
+        "- Nicho: {nicho}\n"
+        "- Plataforma: {plat}\n"
+        "- Fase da campanha: {fase}\n"
+        "- Gargalo identificado: {gargalo}\n"
+        "- Observacao da semana: {obs}\n"
+        "- Leads na semana: {leads}\n"
+        "- Custo por lead: {cpl}  |  Meta: {meta}\n\n"
+        "DOSSIE DO CLIENTE (perfil, tom, comportamento, historico):\n{dossie}"
+    ).format(
+        ini=ctx.get("ini", ""), fim=ctx.get("fim", ""),
+        cliente=ctx.get("cliente", ""), nicho=ctx.get("nicho", "") or "nao informado",
+        plat=ctx.get("plat", "") or "nao informado", fase=ctx.get("fase", "") or "nao informada",
+        gargalo=ctx.get("gargalo", "") or "Nenhum", obs=ctx.get("obs", "") or "(sem observacao)",
+        leads=ctx.get("leads", 0),
+        cpl=("R$%.2f" % ctx["cpl"]) if ctx.get("cpl") else "sem dado de Meta nesta semana",
+        meta=("R$%.2f" % ctx["meta"]) if ctx.get("meta") else "nao definida",
+        dossie=(dossie or "Sem dossie. Use o nicho para definir o tom.")[:4500],
+    )
+    body = {
+        "model": IA_MODEL,
+        "max_tokens": 700,
+        "system": sistema,
+        "messages": [{"role": "user", "content": usuario}],
+    }
+    headers = {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    try:
+        r = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=body, timeout=60)
+        if r.status_code != 200:
+            log("[IA] erro {}: {}".format(r.status_code, r.text[:200]))
+            return ""
+        partes = [b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text"]
+        return "\n".join(partes).strip()
+    except Exception as e:
+        log("[IA] excecao na chamada: {}".format(e))
+        return ""
+
+
 periodo_ini, periodo_fim = periodo_semana()
 
 log("=" * 60)
@@ -478,6 +598,8 @@ mensagens = []
 em_risco = []
 dentro_meta = []
 
+DOSSIES = carregar_dossies()
+
 for t in tasks:
     nome = t.get("name", "")
     empresa = get_campo(t, CAMPOS["cliente"])
@@ -487,6 +609,7 @@ for t in tasks:
     leads_7d = get_campo(t, CAMPOS["leads_7d"]) or 0
     cpl_7d = get_campo(t, CAMPOS["cpl_7d"])
     gargalo = get_campo(t, CAMPOS["gargalo"])
+    obs_sem = get_campo(t, CAMPOS["obs_semana"])
     link = get_campo(t, CAMPOS["link_grupo"])
     nicho_raw = get_campo(t, CAMPOS["nicho"])
     fase = get_campo(t, CAMPOS["fase_campanha"])
@@ -603,12 +726,32 @@ for t in tasks:
             log("[!!] {}: CONTA PARADA (Meta sem gasto nos ultimos 3 dias)".format(nome))
 
     pix_status = "pago" if status_fin == "Pago" else "pendente"
+
+    # --- RELATORIO IA ---
+    relatorio_ia = ""
+    if not conta_parada and ANTHROPIC_API_KEY:
+        ctx_ia = {
+            "ini": periodo_ini, "fim": periodo_fim,
+            "cliente": display, "nicho": nicho_raw,
+            "plat": plat, "fase": fase, "gargalo": gargalo,
+            "obs": obs_sem,
+            "leads": int(leads_7d) if leads_7d else 0,
+            "cpl": c7, "meta": mc,
+        }
+        dossie_txt = achar_dossie(display, DOSSIES)
+        relatorio_ia = gerar_relatorio_ia(ctx_ia, dossie_txt)
+        if relatorio_ia:
+            log("[IA] relatorio gerado para {}".format(display))
+        else:
+            log("[IA] sem relatorio para {} (fallback JS)".format(display))
+
     mensagens.append({
         "nome": display, "saude": saude, "link": link, "msg": msg,
         "segmento": nicho_raw or "", "meta_cpl": mc or "",
         "leads": int(leads_7d) if leads_7d else 0, "cpl": c7 or "",
         "pix_valor": orcamento or "", "pix_status": pix_status,
         "conta_status": "parada" if conta_parada else "ativa",
+        "relatorio_ia": relatorio_ia,
     })
 
 # ---- RESUMO ----
@@ -803,3 +946,12 @@ with open("docs/cs-dados.csv", "w", encoding="utf-8", newline="") as f:
             m.get("link","") or "", m.get("conta_status","ativa"),
         ])
 print("CSV do painel gerado: docs/cs-dados.csv")
+
+# --- JSON com relatorios IA (para o painel) ---
+relatorios_ia = {}
+for m in mensagens:
+    if m.get("relatorio_ia"):
+        relatorios_ia[m["nome"]] = m["relatorio_ia"]
+with open("docs/cs-relatorios.json", "w", encoding="utf-8") as f:
+    json.dump(relatorios_ia, f, ensure_ascii=False, indent=1)
+print("JSON de relatorios IA gerado: docs/cs-relatorios.json ({} clientes)".format(len(relatorios_ia)))
