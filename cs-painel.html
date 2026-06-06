@@ -23,7 +23,7 @@
   h1{font-family:'Fraunces',serif;font-weight:600;font-size:32px;letter-spacing:-.5px;line-height:1.05}
   .sub{color:var(--muted);font-size:14px;margin-top:6px}
   .bar{position:sticky;top:0;z-index:20;background:var(--bg);padding:14px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
   .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
   .stat .n{font-family:'Fraunces',serif;font-size:26px;font-weight:600;line-height:1}
   .stat .l{font-size:11px;color:var(--muted);margin-top:5px;text-transform:uppercase;letter-spacing:.04em}
@@ -44,6 +44,9 @@
   .b-blue{background:var(--blue-bg);color:var(--blue)}
   .b-pix{background:var(--red-bg);color:var(--red)}
   .b-pix-ok{background:var(--green-bg);color:var(--green)}
+  .b-parada{background:#2A2925;color:#fff}
+  .alerta{background:#FBECEC;border:1px solid var(--red);border-radius:12px;padding:16px 18px;font-size:14.5px;white-space:pre-wrap;color:#7A1F18}
+  .card.parada{border-color:var(--red);box-shadow:0 0 0 1px var(--red) inset}
   .msg{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-size:14.5px;white-space:pre-wrap;color:#2A2925}
   .mlabel{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:14px 0 7px;font-weight:600}
   .row{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
@@ -70,6 +73,7 @@
     <div class="stats">
       <div class="stat"><div class="n" id="s-green">—</div><div class="l">Dentro da meta</div></div>
       <div class="stat risk"><div class="n" id="s-risk">—</div><div class="l">Em risco</div></div>
+      <div class="stat risk"><div class="n" id="s-parada">—</div><div class="l">Conta parada</div></div>
       <div class="stat pix"><div class="n" id="s-pixn">—</div><div class="l">Pix a cobrar</div></div>
       <div class="stat pix"><div class="n" id="s-pixv">—</div><div class="l">Total Pix</div></div>
     </div>
@@ -77,6 +81,7 @@
 
   <div class="controls" id="filters">
     <div class="chip on" data-f="todos">Todos</div>
+    <div class="chip" data-f="parada">Conta parada</div>
     <div class="chip" data-f="risco">Em risco</div>
     <div class="chip" data-f="pix">Pix pendente</div>
     <div class="chip" data-f="meta">Dentro da meta</div>
@@ -95,10 +100,26 @@ const CONFIG = {
   // Cole aqui o link CSV da sua planilha Google publicada.
   // (Arquivo → Compartilhar → Publicar na web → escolha a aba → formato CSV → copie o link)
   // Deixe "" para usar os dados de exemplo abaixo.
-  SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRoCitIqaeGuu9wTVCVLnMzZ04kO9Qii7-d6bB9zMULEnEcseSk4j7FEn7cNMCLfXhxSEHBXa3hkChA/pub?gid=371206721&single=true&output=csv",
+  SHEET_CSV_URL: "cs-dados.csv",
 
   PERIODO: "25/05 a 31/05",        // período do relatório da semana
-  CHAVE_PIX: "sua-chave-pix-aqui", // chave usada na mensagem de cobrança de Pix
+
+  // Regra de Pix da verba — só os clientes listados aqui aparecem como "a cobrar".
+  // Valor que voce gera no Meta (QR Code) e envia pro cliente. Edite à vontade.
+  PIX: {
+    "Bom Boi": 300,
+    "Saldão Atacadasso Limeira-SP": 300,
+    "Saldão Atacadasso Macapá": 300,
+    "Saldão Atacadasso Santarém": 300,
+    "Jhonatan": 300,                       // Torre Estrutura metalica e calhas
+    "Mamuh Steakhouse": 300,
+    "Limer Módulos": 725,                  // R$500 Google + R$225 Meta
+    "Athenas Móveis planejados": 1200,     // a cada 10 dias
+  },
+  PIX_OBS: {
+    "Limer Módulos": "R$500 Google Ads + R$225 Meta Ads",
+    "Athenas Móveis planejados": "verba para 10 dias de anúncios",
+  },
 };
 
 /* Dados de exemplo (usados se SHEET_CSV_URL estiver vazio).
@@ -181,13 +202,27 @@ Uma pergunta importante: vocês conseguiram dar retorno rápido pra todas as opo
 
 /* Mensagem de cobrança de Pix da verba */
 function gerarPix(c){
+  const obs = c.pix_obs ? ` (${c.pix_obs})` : "";
   return `Oi ${c.nome}, bom dia!
 
-Pra manter as campanhas rodando sem interrupção essa semana, segue o Pix da verba: ${brl(c.pix_valor)}.
+Segue a verba de mídia dessa semana: ${brl(c.pix_valor)}${obs}.
 
-Chave: ${CONFIG.CHAVE_PIX}
+Vou te enviar o Pix por QR Code na sequência. Assim que cair, já mantenho as campanhas rodando sem interrupção. 🙏`;
+}
 
-Assim que confirmar, me avisa aqui? Aí já sigo a todo vapor. 🙏`;
+/* Alerta interno (NAO enviar ao cliente) quando a conta esta parada */
+function gerarAlerta(c){
+  const pix = c.pix_valor > 0 ? `${brl(c.pix_valor)}${c.pix_obs ? " ("+c.pix_obs+")" : ""}` : "verba da conta";
+  return `⚠️ CONTA PARADA — ${c.nome}
+
+A conta não veiculou nos últimos dias (verba pré-paga zerada ou pagamento pendente). Os números da semana não refletem o trabalho — a conta estava fora do ar.
+
+Ação antes de qualquer relatório:
+1. Gerar o Pix da verba no Meta (${pix}) e enviar ao cliente.
+2. Confirmar que a conta voltou a rodar.
+3. Só então retomar o relatório de performance.
+
+Não enviar relatório de performance enquanto a conta estiver parada.`;
 }
 
 /* Parser CSV simples (lida com aspas) */
@@ -211,8 +246,9 @@ function toClientes(rows){
     return {
       nome:(r[0]||"").trim(), segmento:(r[1]||"").trim(),
       meta, leads, cpl, criativo:(r[5]||"criativo principal").trim(),
-      pix_valor:num(r[6]), pix_status:(r[7]||"").trim().toLowerCase()==="pago"?"pago":"pendente",
+      pix_valor:(CONFIG.PIX[(r[0]||"").trim()] || 0), pix_obs:(CONFIG.PIX_OBS[(r[0]||"").trim()] || ""),
       grupo:(r[8]||"").trim(),
+      conta_parada:(r[9]||"").trim().toLowerCase()==="parada",
       status: statusOf(meta, cpl, leads)
     };
   });
@@ -223,22 +259,41 @@ let CLIENTES=[], FILTRO="todos";
 function render(){
   const list=document.getElementById("list");
   let arr=CLIENTES;
-  if(FILTRO==="risco") arr=CLIENTES.filter(c=>c.status!=="verde");
-  if(FILTRO==="meta")  arr=CLIENTES.filter(c=>c.status==="verde");
-  if(FILTRO==="pix")   arr=CLIENTES.filter(c=>c.pix_status==="pendente");
+  if(FILTRO==="parada") arr=CLIENTES.filter(c=>c.conta_parada);
+  if(FILTRO==="risco") arr=CLIENTES.filter(c=>c.status!=="verde" && !c.conta_parada);
+  if(FILTRO==="meta")  arr=CLIENTES.filter(c=>c.status==="verde" && !c.conta_parada);
+  if(FILTRO==="pix")   arr=CLIENTES.filter(c=>c.pix_valor>0);
 
   if(!arr.length){ list.innerHTML='<div class="empty">Nenhum cliente neste filtro.</div>'; return; }
 
   list.innerHTML=arr.map((c,i)=>{
     const relId="rel"+i, pixId="pix"+i;
-    const pixBadge = c.pix_status==="pendente"
-      ? `<span class="badge b-pix">Pix pendente · ${brl(c.pix_valor)}</span>`
-      : `<span class="badge b-pix-ok">Pix pago</span>`;
+    const temPix = c.pix_valor > 0;
+    const pixBadge = temPix
+      ? `<span class="badge b-pix">Pix a cobrar · ${brl(c.pix_valor)}</span>`
+      : "";
     const grupoBtn = c.grupo ? `<a class="act ghost" href="${c.grupo}" target="_blank" rel="noopener">Abrir grupo</a>` : "";
-    const pixBlock = c.pix_status==="pendente" ? `
+    const pixBlock = temPix ? `
       <div class="mlabel">Cobrança de Pix da verba</div>
       <div class="msg" id="${pixId}">${gerarPix(c)}</div>
       <div class="row"><button class="act" onclick="copy('${pixId}',this)">Copiar cobrança de Pix</button></div>` : "";
+
+    // Conta parada: troca o relatorio de performance por um alerta de acao interno
+    if(c.conta_parada){
+      const alId="al"+i;
+      return `
+      <div class="card parada">
+        <div class="chead">
+          <div><div class="cname">${c.nome}</div><div class="cseg">${c.segmento||""}</div></div>
+          <div class="badges"><span class="badge b-parada">Conta parada</span>${pixBadge}</div>
+        </div>
+        <div class="mlabel">Ação interna — não enviar ao cliente</div>
+        <div class="alerta" id="${alId}">${gerarAlerta(c)}</div>
+        <div class="row">${grupoBtn}</div>
+        ${pixBlock}
+      </div>`;
+    }
+
     return `
     <div class="card">
       <div class="chead">
@@ -265,12 +320,14 @@ function copy(id,btn){
 }
 
 function updateStats(){
-  const verde=CLIENTES.filter(c=>c.status==="verde").length;
-  const risco=CLIENTES.filter(c=>c.status!=="verde").length;
-  const pixPend=CLIENTES.filter(c=>c.pix_status==="pendente");
+  const parada=CLIENTES.filter(c=>c.conta_parada).length;
+  const verde=CLIENTES.filter(c=>c.status==="verde" && !c.conta_parada).length;
+  const risco=CLIENTES.filter(c=>c.status!=="verde" && !c.conta_parada).length;
+  const pixPend=CLIENTES.filter(c=>c.pix_valor>0);
   const totalPix=pixPend.reduce((s,c)=>s+c.pix_valor,0);
   document.getElementById("s-green").textContent=verde;
   document.getElementById("s-risk").textContent=risco;
+  document.getElementById("s-parada").textContent=parada;
   document.getElementById("s-pixn").textContent=pixPend.length;
   document.getElementById("s-pixv").textContent=brl(totalPix);
   document.getElementById("subtitle").textContent=
