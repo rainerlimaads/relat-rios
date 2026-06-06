@@ -33,7 +33,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/cs.html docs/cs-dados.csv
+          git add docs/cs.html docs/cs-dados.csv docs/cs-relatorios.json
           git commit -m "CS Semanal atualizado $(date +'%d/%m/%Y')" || echo "Nada para commitar"
           git push
 
