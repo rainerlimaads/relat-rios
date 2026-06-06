@@ -1,348 +1,340 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Painel de CS — DD Mkt</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Albert+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#F4F2EC; --surface:#FFFFFF; --ink:#1C1B19; --muted:#6E6C66; --faint:#9A988F;
-    --line:#E4E1D8; --accent:#B5471F;
-    --green:#2E7D52; --green-bg:#E6F2EA;
-    --amber:#9A6B12; --amber-bg:#FBEFD8;
-    --red:#C0392B; --red-bg:#FBE9E7;
-    --blue:#2C6FB0; --blue-bg:#E8F0F8;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:'Albert Sans',sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased;padding:0 0 80px}
-  .wrap{max-width:880px;margin:0 auto;padding:0 20px}
-  header.top{padding:36px 0 20px}
-  h1{font-family:'Fraunces',serif;font-weight:600;font-size:32px;letter-spacing:-.5px;line-height:1.05}
-  .sub{color:var(--muted);font-size:14px;margin-top:6px}
-  .bar{position:sticky;top:0;z-index:20;background:var(--bg);padding:14px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
-  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-  .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-  .stat .n{font-family:'Fraunces',serif;font-size:26px;font-weight:600;line-height:1}
-  .stat .l{font-size:11px;color:var(--muted);margin-top:5px;text-transform:uppercase;letter-spacing:.04em}
-  .stat.risk .n{color:var(--red)}
-  .stat.pix .n{color:var(--accent)}
-  .controls{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 4px}
-  .chip{font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;font-weight:500;transition:.15s}
-  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin-top:14px}
-  .chead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
-  .cname{font-family:'Fraunces',serif;font-size:21px;font-weight:600}
-  .cseg{font-size:12px;color:var(--faint);margin-top:1px}
-  .badges{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-  .badge{font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;white-space:nowrap}
-  .b-green{background:var(--green-bg);color:var(--green)}
-  .b-amber{background:var(--amber-bg);color:var(--amber)}
-  .b-red{background:var(--red-bg);color:var(--red)}
-  .b-blue{background:var(--blue-bg);color:var(--blue)}
-  .b-pix{background:var(--red-bg);color:var(--red)}
-  .b-pix-ok{background:var(--green-bg);color:var(--green)}
-  .b-parada{background:#2A2925;color:#fff}
-  .alerta{background:#FBECEC;border:1px solid var(--red);border-radius:12px;padding:16px 18px;font-size:14.5px;white-space:pre-wrap;color:#7A1F18}
-  .card.parada{border-color:var(--red);box-shadow:0 0 0 1px var(--red) inset}
-  .msg{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-size:14.5px;white-space:pre-wrap;color:#2A2925}
-  .mlabel{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:14px 0 7px;font-weight:600}
-  .row{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
-  button.act{font-family:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:10px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;transition:.15s}
-  button.act:active{transform:scale(.98)}
-  button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
-  button.ghost:hover{border-color:var(--ink)}
-  button.copied{background:var(--green)!important;border-color:var(--green)!important;color:#fff!important}
-  a.act{text-decoration:none;display:inline-block}
-  .empty{text-align:center;color:var(--muted);padding:50px 20px;font-size:15px}
-  .loading{text-align:center;color:var(--muted);padding:40px;font-size:14px}
-  .note{font-size:12px;color:var(--faint);margin-top:24px;text-align:center;line-height:1.7}
-  @media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}h1{font-size:26px}}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de CS — DD Mkt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Albert+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#F4F2EC; --surface:#FFFFFF; --ink:#1C1B19; --muted:#6E6C66; --faint:#9A988F;
+      --line:#E4E1D8; --accent:#B5471F;
+      --green:#2E7D52; --green-bg:#E6F2EA;
+      --amber:#9A6B12; --amber-bg:#FBEFD8;
+      --red:#C0392B; --red-bg:#FBE9E7;
+      --blue:#2C6FB0; --blue-bg:#E8F0F8;
+      --dark:#3A3A3A; --dark-bg:#E8E8E8;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--ink);font-family:'Albert Sans',sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased;padding:0 0 80px}
+    .wrap{max-width:880px;margin:0 auto;padding:0 20px}
+    header,.top{padding:36px 0 20px}
+    h1{font-family:'Fraunces',serif;font-weight:600;font-size:32px;letter-spacing:-.5px;line-height:1.05}
+    .sub{color:var(--muted);font-size:14px;margin-top:6px}
+    .week-badge{display:inline-block;background:var(--accent);color:#fff;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;margin-left:8px;vertical-align:middle}
+    .bar{position:sticky;top:0;z-index:20;background:var(--bg);padding:14px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+    .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+    .stat .n{font-family:'Fraunces',serif;font-size:26px;font-weight:600;line-height:1}
+    .stat .l{font-size:11px;color:var(--muted);margin-top:5px;text-transform:uppercase;letter-spacing:.04em}
+    .stat.risk .n{color:var(--red)}
+    .stat.pix .n{color:var(--accent)}
+    /* Tabs */
+    .tabs{display:flex;gap:0;margin:16px 0 8px;border-bottom:2px solid var(--line)}
+    .tab{padding:10px 20px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .2s}
+    .tab:hover{color:var(--ink)}
+    .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    .tab .tab-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px;vertical-align:middle}
+    .tab .tab-dot.done{background:var(--green)}
+    .tab .tab-dot.pending{background:var(--amber)}
+    /* Acao rotativa banner */
+    .acao-banner{background:var(--blue-bg);border:1px solid #b8d4ee;border-radius:10px;padding:12px 16px;margin:10px 0 16px;font-size:13px;color:var(--blue)}
+    .acao-banner strong{font-weight:600}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 4px}
+    .chip{font-size:13px;padding:6px 14px;border-radius:999px;background:var(--surface);color:var(--muted);border:1px solid var(--line);cursor:pointer;font-weight:500}
+    .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+    /* Cards */
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;margin-bottom:16px}
+    .card.parada{border-left:4px solid var(--dark)}
+    .card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+    .cname{font-family:'Fraunces',serif;font-size:20px;font-weight:500}
+    .cseg{font-size:13px;color:var(--muted)}
+    .badges{display:flex;gap:6px;flex-wrap:wrap}
+    .badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;white-space:nowrap}
+    .badge.verde{background:var(--green-bg);color:var(--green)}
+    .badge.amarelo{background:var(--amber-bg);color:var(--amber)}
+    .badge.vermelho{background:var(--red-bg);color:var(--red)}
+    .badge.parada{background:var(--dark-bg);color:var(--dark)}
+    .badge.pix{background:#FFF3E0;color:var(--accent);border:1px solid #FDDCB5}
+    .section-label{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px}
+    .msg{background:var(--bg);border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.65;white-space:pre-wrap;word-wrap:break-word}
+    .alerta{background:#2D2D2D;color:#F5C6C6;border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.65;white-space:pre-wrap}
+    .actions{display:flex;gap:12px;align-items:center;margin-top:12px;flex-wrap:wrap}
+    .btn{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+    .btn-copy{background:var(--ink);color:#fff}
+    .btn-copy.copied{background:var(--green);color:#fff}
+    .btn-link{background:none;color:var(--blue);font-weight:500;text-decoration:none;font-size:13px}
+    .pix-block{background:#FFF8F0;border:1px solid #FDDCB5;border-radius:10px;padding:14px 18px;margin-top:12px;font-size:14px;line-height:1.6;white-space:pre-wrap}
+    .empty{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+    .progress-bar{height:4px;background:var(--line);border-radius:2px;margin-top:6px;overflow:hidden}
+    .progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width .3s}
+    #note{font-size:12px;color:var(--faint);margin-top:8px}
+    @media(max-width:600px){
+      .stats{grid-template-columns:repeat(3,1fr)}
+      .tabs{overflow-x:auto}
+      .tab{padding:8px 14px;font-size:13px;white-space:nowrap}
+    }
+  </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
     <h1>Painel de CS</h1>
-    <div class="sub" id="subtitle">Carregando…</div>
+    <div class="sub" id="sub">Carregando...</div>
   </header>
-
-  <div class="bar">
-    <div class="stats">
-      <div class="stat"><div class="n" id="s-green">—</div><div class="l">Dentro da meta</div></div>
-      <div class="stat risk"><div class="n" id="s-risk">—</div><div class="l">Em risco</div></div>
-      <div class="stat risk"><div class="n" id="s-parada">—</div><div class="l">Conta parada</div></div>
-      <div class="stat pix"><div class="n" id="s-pixn">—</div><div class="l">Pix a cobrar</div></div>
-      <div class="stat pix"><div class="n" id="s-pixv">—</div><div class="l">Total Pix</div></div>
-    </div>
-  </div>
-
-  <div class="controls" id="filters">
-    <div class="chip on" data-f="todos">Todos</div>
-    <div class="chip" data-f="parada">Conta parada</div>
-    <div class="chip" data-f="risco">Em risco</div>
-    <div class="chip" data-f="pix">Pix pendente</div>
-    <div class="chip" data-f="meta">Dentro da meta</div>
-  </div>
-
-  <div id="list"><div class="loading">Carregando clientes…</div></div>
-
-  <div class="note" id="note"></div>
+  <div class="stats" id="stats"></div>
+  <div class="tabs" id="tabs"></div>
+  <div id="acao-banner"></div>
+  <div class="controls" id="filters"></div>
+  <div id="list"></div>
+  <div id="note"></div>
 </div>
 
 <script>
-/* ============================================================
-   CONFIGURAÇÃO — edite só esta parte
-   ============================================================ */
 const CONFIG = {
-  // Cole aqui o link CSV da sua planilha Google publicada.
-  // (Arquivo → Compartilhar → Publicar na web → escolha a aba → formato CSV → copie o link)
-  // Deixe "" para usar os dados de exemplo abaixo.
   SHEET_CSV_URL: "cs-dados.csv",
-
-  PERIODO: "25/05 a 31/05",        // período do relatório da semana
-
-  // Regra de Pix da verba — só os clientes listados aqui aparecem como "a cobrar".
-  // Valor que voce gera no Meta (QR Code) e envia pro cliente. Edite à vontade.
+  PERIODO: "",
   PIX: {
-    "Bom Boi": 300,
-    "Saldão Atacadasso Limeira-SP": 300,
-    "Saldão Atacadasso Macapá": 300,
-    "Saldão Atacadasso Santarém": 300,
-    "Jhonatan": 300,                       // Torre Estrutura metalica e calhas
-    "Mamuh Steakhouse": 300,
-    "Limer Módulos": 725,                  // R$500 Google + R$225 Meta
-    "Athenas Móveis planejados": 1200,     // a cada 10 dias
+    "Bom Boi":300,"Saldão Atacadasso Limeira-SP":300,"Saldão Atacadasso Macapá":300,
+    "Saldão Atacadasso Santarém":300,"Jhonatan":300,"Mamuh Steakhouse":300,
+    "Limer Módulos":725,"Athenas Móveis planejados":1200
   },
-  PIX_OBS: {
-    "Limer Módulos": "R$500 Google Ads + R$225 Meta Ads",
-    "Athenas Móveis planejados": "verba para 10 dias de anúncios",
-  },
+  PIX_OBS: {"Athenas Móveis planejados":"Verba para 10 dias","Limer Módulos":"R$500 Google + R$225 Meta"}
 };
 
-/* Dados de exemplo (usados se SHEET_CSV_URL estiver vazio).
-   Colunas da planilha, nesta ordem:
-   cliente | segmento | meta_cpl | leads | cpl | criativo | pix_valor | pix_status | grupo_link
-   pix_status: "pago" ou "pendente" */
-const SAMPLE = [
-  ["Jhonatan","Imobiliário","10","1","44.05","Vídeo depoimento","300","pendente",""],
-  ["Loja de roupa","Varejo","12","38","9.40","Carrossel coleção","250","pago",""],
-  ["Clínica Brivva","Odontologia","25","19","22.10","Vídeo Dr. Cássio","400","pendente",""],
-  ["Athenas Planejados","Móveis","30","12","27.80","Portal das Rosas","350","pago",""],
-  ["Atacado Semijoias","Atacado","8","9","13.50","Reels feira","200","pendente",""],
-];
-
-/* ============================================================
-   LÓGICA — não precisa mexer daqui pra baixo
-   ============================================================ */
-const brl = n => "R$ " + Number(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const num = v => { const n = parseFloat(String(v).replace(",",".").replace(/[^\d.]/g,"")); return isNaN(n)?0:n; };
+const brl = v => "R$ "+Number(v||0).toFixed(2).replace(".",",");
 
-function statusOf(meta, cpl, leads){
-  if(leads <= 1 || cpl > meta*1.6) return "vermelho";
-  if(cpl > meta) return "amarelo";
-  return "verde";
+function statusOf(meta,cpl,leads){
+  if(!meta || meta<=0) return leads>0?"verde":"amarelo";
+  if(cpl<=0 && leads<=0) return "vermelho";
+  return cpl<=meta?"verde":"vermelho";
 }
 
-function badge(st){
-  if(st==="verde")  return '<span class="badge b-green">Dentro da meta</span>';
-  if(st==="amarelo")return '<span class="badge b-amber">Atenção</span>';
-  return '<span class="badge b-red">Em risco</span>';
-}
-
-/* Gera a mensagem de relatório — tom e estrutura variam por status */
-function gerarRelatorio(c){
-  // Prioridade: relatorio gerado pela IA (vem do motor semanal)
-  if(window.RELATORIOS_IA && window.RELATORIOS_IA[c.nome]){
-    return window.RELATORIOS_IA[c.nome];
-  }
-  const {nome, leads, cpl, meta, criativo} = c;
-  const per = CONFIG.PERIODO;
-  const oport = leads === 1 ? "1 oportunidade" : `${leads} oportunidades`;
-
-  if(c.status === "verde"){
-    return `Bom dia, ${nome}! 🙌
-
-Relatório da semana (${per}) 👇
-
-Geramos ${oport} a ${brl(cpl)} cada — dentro da nossa meta de ${brl(meta)}. Semana sólida.
-
-Destaque: o criativo "${criativo}" foi o que mais puxou resultado.
-
-Essa semana o foco é escalar o que está funcionando e testar um novo ângulo pra trazer ainda mais volume com qualidade.
-
-Conseguiram dar retorno pra todas as oportunidades? A velocidade de resposta faz diferença direta na conversão. 🎯`;
-  }
-
-  if(c.status === "amarelo"){
-    return `Bom dia, ${nome}!
-
-Relatório da semana (${per}) 👇
-
-Tivemos ${oport} a ${brl(cpl)} cada — um pouco acima da nossa meta de ${brl(meta)}.
-
-Não é motivo de alarme, mas já estou agindo. Essa semana vou:
-• Revisar os criativos com menor desempenho
-• Testar um novo ângulo de comunicação pra reduzir o custo
-
-Acompanho de perto e te trago um update no meio da semana. Como está a qualidade das oportunidades que chegaram? 💪`;
-  }
-
-  // vermelho
-  return `Bom dia, ${nome}.
-
-Relatório da semana (${per}) 👇
-
-Tivemos ${oport} a ${brl(cpl)} cada — acima da nossa meta de ${brl(meta)}.
-
-Quero ser direto com você: essa conta está com atenção total essa semana. Vou revisar a estrutura das campanhas e ajustar a segmentação pra recuperar a eficiência.
-
-Te trago um diagnóstico com plano de ação até quarta — você vai ser o primeiro a saber.
-
-Uma pergunta importante: vocês conseguiram dar retorno rápido pra todas as oportunidades? Lead parado esfria e encarece o resultado.`;
-}
-
-/* Mensagem de cobrança de Pix da verba */
-function gerarPix(c){
-  const obs = c.pix_obs ? ` (${c.pix_obs})` : "";
-  return `Oi ${c.nome}, bom dia!
-
-Segue a verba de mídia dessa semana: ${brl(c.pix_valor)}${obs}.
-
-Vou te enviar o Pix por QR Code na sequência. Assim que cair, já mantenho as campanhas rodando sem interrupção. 🙏`;
-}
-
-/* Alerta interno (NAO enviar ao cliente) quando a conta esta parada */
-function gerarAlerta(c){
-  const pix = c.pix_valor > 0 ? `${brl(c.pix_valor)}${c.pix_obs ? " ("+c.pix_obs+")" : ""}` : "verba da conta";
-  return `⚠️ CONTA PARADA — ${c.nome}
-
-A conta não veiculou nos últimos dias (verba pré-paga zerada ou pagamento pendente). Os números da semana não refletem o trabalho — a conta estava fora do ar.
-
-Ação antes de qualquer relatório:
-1. Gerar o Pix da verba no Meta (${pix}) e enviar ao cliente.
-2. Confirmar que a conta voltou a rodar.
-3. Só então retomar o relatório de performance.
-
-Não enviar relatório de performance enquanto a conta estiver parada.`;
-}
-
-/* Parser CSV simples (lida com aspas) */
 function parseCSV(text){
-  const rows=[]; let row=[],val="",q=false;
+  const rows=[];let cur=[],f="",inQ=false;
   for(let i=0;i<text.length;i++){
     const ch=text[i];
-    if(q){ if(ch==='"'){ if(text[i+1]==='"'){val+='"';i++} else q=false } else val+=ch }
-    else{ if(ch==='"')q=true; else if(ch===","){row.push(val);val=""} else if(ch==="\n"){row.push(val);rows.push(row);row=[];val=""} else if(ch!=="\r")val+=ch }
+    if(inQ){if(ch==='"'&&text[i+1]==='"'){f+='"';i++}else if(ch==='"')inQ=false;else f+=ch}
+    else{if(ch==='"')inQ=true;else if(ch===','){cur.push(f);f=""}else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;cur.push(f);if(cur.length>1||cur[0])rows.push(cur);cur=[];f=""}else f+=ch}
   }
-  if(val.length||row.length){row.push(val);rows.push(row)}
-  return rows.filter(r=>r.some(x=>x.trim()!==""));
+  if(f||cur.length){cur.push(f);rows.push(cur)}
+  return rows;
+}
+
+// ---- State ----
+let CLIENTES = [];
+let CURRENT_TAB = "terca";
+let CURRENT_FILTER = "todos";
+let RELATORIOS = {};
+let META_INFO = {};
+
+const TABS_CONFIG = [
+  {id:"segunda",label:"Segunda",desc:"Abertura motivacional"},
+  {id:"terca",label:"Terça",desc:"Relatório de performance"},
+  {id:"sexta",label:"Sexta",desc:"Fechamento qualitativo"},
+  {id:"acao",label:"Ação rotativa",desc:"Ação da semana"}
+];
+
+// ---- Tracking (localStorage) ----
+function getTrackKey(){
+  return "cs_track_"+CONFIG.PERIODO.replace(/\s/g,"_");
+}
+function getTrack(){
+  try{return JSON.parse(localStorage.getItem(getTrackKey())||"{}")}catch(e){return{}}
+}
+function markCopied(nome,dia){
+  const t=getTrack();
+  if(!t[nome]) t[nome]={};
+  t[nome][dia]=Date.now();
+  try{localStorage.setItem(getTrackKey(),JSON.stringify(t))}catch(e){}
+}
+function isCopied(nome,dia){
+  const t=getTrack();
+  return !!(t[nome]&&t[nome][dia]);
+}
+function getProgress(dia){
+  const t=getTrack();
+  const total=CLIENTES.filter(c=>!c.conta_parada).length;
+  if(!total) return 0;
+  let done=0;
+  for(const c of CLIENTES){
+    if(!c.conta_parada && t[c.nome] && t[c.nome][dia]) done++;
+  }
+  return Math.round(done/total*100);
+}
+
+function getMsgForTab(c, tab){
+  const r = RELATORIOS[c.nome];
+  if(!r) return null;
+  if(tab==="acao") return r.acao_rotativa||null;
+  return r[tab]||null;
+}
+
+function gerarRelatorioFallback(c){
+  const {nome,leads,cpl,meta}=c;
+  const per=CONFIG.PERIODO;
+  const oport=leads===1?"1 oportunidade":`${leads} oportunidades`;
+  if(c.status==="verde"){
+    return `Bom dia, ${nome}!\n\nRelatório da semana (${per})\n\nGeramos ${oport} a ${brl(cpl)} cada, dentro da meta de ${brl(meta)}. Semana sólida.\n\nFoco dessa semana: escalar o que está funcionando.\n\nConseguiram dar retorno pra todas as oportunidades?`;
+  }
+  if(c.status==="amarelo"){
+    return `Bom dia, ${nome}!\n\nRelatório da semana (${per})\n\nSemana de ajuste. Estou revisando a estrutura das campanhas e a segmentação.\n\nTe trago um diagnóstico com plano de ação até quarta.`;
+  }
+  return `Bom dia, ${nome}!\n\nRelatório da semana (${per})\n\nTivemos ${oport} a ${brl(cpl)} cada, acima da meta de ${brl(meta)}.\n\nEstou revisando a estrutura pra recuperar a eficiência. Te trago plano de ação até quarta.\n\nConseguiram dar retorno rápido pra todas as oportunidades?`;
+}
+
+function gerarAlerta(c){
+  return `CONTA PARADA: ${c.nome}\n\nA conta de anúncios parou por falta de verba.\n\nAção imediata: gerar Pix e reativar.\nNão enviar relatório de performance ao cliente enquanto a conta estiver parada.`;
+}
+
+function gerarPix(c){
+  if(!c.pix_valor || c.pix_valor<=0) return "";
+  let t = `Pix da semana: ${brl(c.pix_valor)}`;
+  if(c.pix_obs) t += `\n${c.pix_obs}`;
+  t += `\n\nGerei o QR Code aqui no gerenciador. Vou mandar pra vocês fazerem o pagamento, combinado?`;
+  return t;
 }
 
 function toClientes(rows){
-  // pula cabeçalho se a primeira coluna não for número na 3ª posição
-  let data = rows;
-  if(rows.length && (rows[0][0]||"").trim().toLowerCase()==="cliente") data = rows.slice(1);
+  let data=rows;
+  if(rows.length && (rows[0][0]||"").trim().toLowerCase()==="cliente") data=rows.slice(1);
   return data.map(r=>{
-    const meta=num(r[2]), cpl=num(r[4]), leads=Math.round(num(r[3]));
+    const meta=num(r[2]),cpl=num(r[4]),leads=Math.round(num(r[3]));
     return {
       nome:(r[0]||"").trim(), segmento:(r[1]||"").trim(),
-      meta, leads, cpl, criativo:(r[5]||"criativo principal").trim(),
-      pix_valor:(CONFIG.PIX[(r[0]||"").trim()] || 0), pix_obs:(CONFIG.PIX_OBS[(r[0]||"").trim()] || ""),
+      meta, leads, cpl, criativo:(r[5]||"").trim(),
+      pix_valor:(CONFIG.PIX[(r[0]||"").trim()]||0), pix_obs:(CONFIG.PIX_OBS[(r[0]||"").trim()]||""),
       grupo:(r[8]||"").trim(),
       conta_parada:(r[9]||"").trim().toLowerCase()==="parada",
-      status: statusOf(meta, cpl, leads)
+      status:statusOf(meta,cpl,leads)
     };
   });
 }
 
-let CLIENTES=[], FILTRO="todos";
-
-function render(){
-  const list=document.getElementById("list");
-  let arr=CLIENTES;
-  if(FILTRO==="parada") arr=CLIENTES.filter(c=>c.conta_parada);
-  if(FILTRO==="risco") arr=CLIENTES.filter(c=>c.status!=="verde" && !c.conta_parada);
-  if(FILTRO==="meta")  arr=CLIENTES.filter(c=>c.status==="verde" && !c.conta_parada);
-  if(FILTRO==="pix")   arr=CLIENTES.filter(c=>c.pix_valor>0);
-
-  if(!arr.length){ list.innerHTML='<div class="empty">Nenhum cliente neste filtro.</div>'; return; }
-
-  list.innerHTML=arr.map((c,i)=>{
-    const relId="rel"+i, pixId="pix"+i;
-    const temPix = c.pix_valor > 0;
-    const pixBadge = temPix
-      ? `<span class="badge b-pix">Pix a cobrar · ${brl(c.pix_valor)}</span>`
-      : "";
-    const grupoBtn = c.grupo ? `<a class="act ghost" href="${c.grupo}" target="_blank" rel="noopener">Abrir grupo</a>` : "";
-    const pixBlock = temPix ? `
-      <div class="mlabel">Cobrança de Pix da verba</div>
-      <div class="msg" id="${pixId}">${gerarPix(c)}</div>
-      <div class="row"><button class="act" onclick="copy('${pixId}',this)">Copiar cobrança de Pix</button></div>` : "";
-
-    // Conta parada: troca o relatorio de performance por um alerta de acao interno
-    if(c.conta_parada){
-      const alId="al"+i;
-      return `
-      <div class="card parada">
-        <div class="chead">
-          <div><div class="cname">${c.nome}</div><div class="cseg">${c.segmento||""}</div></div>
-          <div class="badges"><span class="badge b-parada">Conta parada</span>${pixBadge}</div>
-        </div>
-        <div class="mlabel">Ação interna — não enviar ao cliente</div>
-        <div class="alerta" id="${alId}">${gerarAlerta(c)}</div>
-        <div class="row">${grupoBtn}</div>
-        ${pixBlock}
-      </div>`;
-    }
-
-    return `
-    <div class="card">
-      <div class="chead">
-        <div><div class="cname">${c.nome}</div><div class="cseg">${c.segmento||""}</div></div>
-        <div class="badges">${badge(c.status)}${pixBadge}</div>
-      </div>
-      <div class="mlabel">Relatório de performance — copiar e enviar no grupo</div>
-      <div class="msg" id="${relId}">${gerarRelatorio(c)}</div>
-      <div class="row">
-        <button class="act" onclick="copy('${relId}',this)">Copiar relatório</button>
-        ${grupoBtn}
-      </div>
-      ${pixBlock}
-    </div>`;
+function renderTabs(){
+  const el=document.getElementById("tabs");
+  el.innerHTML=TABS_CONFIG.map(t=>{
+    const prog=getProgress(t.id);
+    const cls=t.id===CURRENT_TAB?"tab active":"tab";
+    return `<div class="${cls}" onclick="switchTab('${t.id}')">${t.label}</div>`;
   }).join("");
 }
 
-function copy(id,btn){
-  const t=document.getElementById(id).innerText;
-  navigator.clipboard.writeText(t).then(()=>{
-    const old=btn.textContent; btn.textContent="Copiado ✓"; btn.classList.add("copied");
-    setTimeout(()=>{btn.textContent=old;btn.classList.remove("copied")},1600);
-  });
+function renderAcaoBanner(){
+  const el=document.getElementById("acao-banner");
+  if(META_INFO.acao_rotativa){
+    const sem=META_INFO.semana||"?";
+    el.innerHTML=`<div class="acao-banner"><strong>Semana ${sem}/4</strong> &middot; Ação rotativa: <strong>${META_INFO.acao_rotativa}</strong></div>`;
+  } else { el.innerHTML=""; }
 }
 
 function updateStats(){
-  const parada=CLIENTES.filter(c=>c.conta_parada).length;
-  const verde=CLIENTES.filter(c=>c.status==="verde" && !c.conta_parada).length;
-  const risco=CLIENTES.filter(c=>c.status!=="verde" && !c.conta_parada).length;
-  const pixPend=CLIENTES.filter(c=>c.pix_valor>0);
-  const totalPix=pixPend.reduce((s,c)=>s+c.pix_valor,0);
-  document.getElementById("s-green").textContent=verde;
-  document.getElementById("s-risk").textContent=risco;
-  document.getElementById("s-parada").textContent=parada;
-  document.getElementById("s-pixn").textContent=pixPend.length;
-  document.getElementById("s-pixv").textContent=brl(totalPix);
-  document.getElementById("subtitle").textContent=
-    `Semana ${CONFIG.PERIODO} · ${CLIENTES.length} clientes · atualizado ${new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}`;
+  const total=CLIENTES.length;
+  const verdes=CLIENTES.filter(c=>c.status==="verde"&&!c.conta_parada).length;
+  const risco=CLIENTES.filter(c=>c.status!=="verde"&&!c.conta_parada).length;
+  const paradas=CLIENTES.filter(c=>c.conta_parada).length;
+  const pixList=CLIENTES.filter(c=>c.pix_valor>0);
+  const pixTotal=pixList.reduce((s,c)=>s+c.pix_valor,0);
+  document.getElementById("stats").innerHTML=`
+    <div class="stat"><div class="n">${verdes}</div><div class="l">Dentro da meta</div></div>
+    <div class="stat risk"><div class="n">${risco}</div><div class="l">Em risco</div></div>
+    <div class="stat"><div class="n">${paradas}</div><div class="l">Conta parada</div></div>
+    <div class="stat"><div class="n">${pixList.length}</div><div class="l">Pix a cobrar</div></div>
+    <div class="stat pix"><div class="n">${brl(pixTotal)}</div><div class="l">Total Pix</div></div>`;
+  // Progress
+  const prog=getProgress(CURRENT_TAB);
+  document.getElementById("sub").innerHTML=`${CONFIG.PERIODO} &middot; ${total} clientes &middot; atualizado ${new Date().toLocaleDateString("pt-BR")}, ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}<br><span style="font-size:11px">Progresso ${TABS_CONFIG.find(t=>t.id===CURRENT_TAB).label}: ${prog}% copiados</span><div class="progress-bar"><div class="progress-fill" style="width:${prog}%"></div></div>`;
 }
 
-document.getElementById("filters").addEventListener("click",e=>{
-  if(!e.target.classList.contains("chip"))return;
-  document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
-  e.target.classList.add("on"); FILTRO=e.target.dataset.f; render();
-});
+function renderFilters(){
+  const filters=["todos","conta parada","em risco","pix pendente","dentro da meta"];
+  document.getElementById("filters").innerHTML=filters.map(f=>`<div class="chip ${CURRENT_FILTER===f?'on':''}" onclick="setFilter('${f}')">${f.charAt(0).toUpperCase()+f.slice(1)}</div>`).join("");
+}
+
+function setFilter(f){CURRENT_FILTER=f;render();}
+function switchTab(t){CURRENT_TAB=t;render();renderTabs();updateStats();}
+
+function render(){
+  renderFilters();
+  let list=CLIENTES;
+  if(CURRENT_FILTER==="conta parada") list=list.filter(c=>c.conta_parada);
+  else if(CURRENT_FILTER==="em risco") list=list.filter(c=>c.status!=="verde"&&!c.conta_parada);
+  else if(CURRENT_FILTER==="pix pendente") list=list.filter(c=>c.pix_valor>0);
+  else if(CURRENT_FILTER==="dentro da meta") list=list.filter(c=>c.status==="verde"&&!c.conta_parada);
+
+  if(!list.length){document.getElementById("list").innerHTML='<div class="empty">Nenhum cliente nessa categoria.</div>';return;}
+
+  const html=list.map((c,i)=>{
+    const relId="rel_"+i, alId="al_"+i, pixId="pix_"+i, btnId="btn_"+i;
+    const statusLabel=c.conta_parada?"parada":c.status==="verde"?"Dentro da meta":"Atenção";
+    const statusClass=c.conta_parada?"parada":c.status==="verde"?"verde":c.status==="amarelo"?"amarelo":"vermelho";
+    const copied=isCopied(c.nome,CURRENT_TAB);
+
+    let badges=`<span class="badge ${statusClass}">${c.conta_parada?"Conta parada":statusLabel}</span>`;
+    if(c.pix_valor>0) badges+=`<span class="badge pix">Pix a cobrar &middot; ${brl(c.pix_valor)}</span>`;
+
+    let content="";
+    if(c.conta_parada){
+      content=`<div class="section-label">AÇÃO INTERNA — NÃO ENVIAR AO CLIENTE</div><div class="alerta" id="${alId}">${gerarAlerta(c)}</div>`;
+      // Pix even for parada
+      if(c.pix_valor>0 && (CURRENT_TAB==="segunda"||CURRENT_TAB==="terca")){
+        content+=`<div class="section-label">COBRANÇA DE PIX DA VERBA</div><div class="pix-block" id="${pixId}">${gerarPix(c)}</div>`;
+      }
+    } else {
+      // Get message for current tab
+      const aiMsg = getMsgForTab(c, CURRENT_TAB);
+      const tabInfo = TABS_CONFIG.find(t=>t.id===CURRENT_TAB);
+      let msgText = "";
+      if(CURRENT_TAB==="terca"){
+        msgText = aiMsg || gerarRelatorioFallback(c);
+      } else if(aiMsg){
+        msgText = aiMsg;
+      } else {
+        msgText = "(Mensagem não disponível para este dia. Rode a Action novamente.)";
+      }
+
+      const sectionLabel = CURRENT_TAB==="segunda"?"ABERTURA DA SEMANA — COPIAR E ENVIAR NO GRUPO"
+        :CURRENT_TAB==="terca"?"RELATÓRIO DE PERFORMANCE — COPIAR E ENVIAR NO GRUPO"
+        :CURRENT_TAB==="sexta"?"FECHAMENTO DA SEMANA — COPIAR E ENVIAR NO GRUPO"
+        :"AÇÃO ROTATIVA — ORIENTAÇÃO PARA CS";
+
+      content=`<div class="section-label">${sectionLabel}</div><div class="msg" id="${relId}">${msgText}</div>
+        <div class="actions">
+          <button class="btn btn-copy ${copied?'copied':''}" id="${btnId}" onclick="copyMsg('${relId}','${btnId}','${c.nome.replace(/'/g,"\\'")}')">
+            ${copied?'Copiado ✓':'Copiar '+tabInfo.label.toLowerCase()}
+          </button>
+          ${c.grupo?`<a class="btn-link" href="${c.grupo}" target="_blank">Abrir grupo</a>`:""}
+        </div>`;
+
+      // Pix on Monday tab
+      if(c.pix_valor>0 && CURRENT_TAB==="segunda"){
+        content+=`<div class="section-label">COBRANÇA DE PIX DA VERBA</div><div class="pix-block" id="${pixId}">${gerarPix(c)}</div>
+          <div class="actions"><button class="btn btn-copy" onclick="copyMsg('${pixId}','this')">Copiar Pix</button></div>`;
+      }
+    }
+
+    return `<div class="card ${c.conta_parada?'parada':''}">
+      <div class="card-head"><div><div class="cname">${c.nome}</div><div class="cseg">${c.segmento||""}</div></div><div class="badges">${badges}</div></div>
+      ${content}
+    </div>`;
+  }).join("");
+
+  document.getElementById("list").innerHTML=html;
+}
+
+function copyMsg(elId, btnId, nome){
+  const el=document.getElementById(elId);
+  if(!el) return;
+  navigator.clipboard.writeText(el.innerText).then(()=>{
+    if(nome) markCopied(nome, CURRENT_TAB);
+    const btn=typeof btnId==="string"?document.getElementById(btnId):btnId;
+    if(btn){btn.textContent="Copiado ✓";btn.classList.add("copied");}
+    updateStats();
+  });
+}
 
 async function boot(){
   try{
@@ -350,21 +342,34 @@ async function boot(){
     if(CONFIG.SHEET_CSV_URL){
       const res=await fetch(CONFIG.SHEET_CSV_URL,{cache:"no-store"});
       rows=parseCSV(await res.text());
-      document.getElementById("note").textContent="Dados ao vivo da planilha. Atualize a planilha e recarregue a página para ver os números novos.";
-    }else{
-      rows=SAMPLE.map(r=>r.slice());
-      document.getElementById("note").textContent="Mostrando dados de EXEMPLO. Configure SHEET_CSV_URL no código para puxar dados reais da sua planilha.";
+      document.getElementById("note").textContent="Dados ao vivo. Recarregue a página para atualizar.";
+    } else {
+      rows=[];
+      document.getElementById("note").textContent="Configure SHEET_CSV_URL no código.";
     }
-    // Carrega relatorios gerados pela IA (se existir)
+    // Load AI messages
     try{
       const rr=await fetch("cs-relatorios.json",{cache:"no-store"});
-      if(rr.ok) window.RELATORIOS_IA=await rr.json();
-      else window.RELATORIOS_IA={};
-    }catch(e){ window.RELATORIOS_IA={}; }
+      if(rr.ok){
+        const data=await rr.json();
+        META_INFO=data._meta||{};
+        delete data._meta;
+        RELATORIOS=data;
+        CONFIG.PERIODO=META_INFO.periodo||"";
+      }
+    }catch(e){RELATORIOS={};META_INFO={};}
+
     CLIENTES=toClientes(rows);
-    updateStats(); render();
+    // Auto-detect best tab for today
+    const dow=new Date().getDay();
+    if(dow===1) CURRENT_TAB="segunda";
+    else if(dow===2) CURRENT_TAB="terca";
+    else if(dow===5) CURRENT_TAB="sexta";
+    else CURRENT_TAB="terca"; // default
+
+    renderTabs(); renderAcaoBanner(); updateStats(); render();
   }catch(err){
-    document.getElementById("list").innerHTML='<div class="empty">Não consegui carregar a planilha. Confira se o link CSV está publicado e correto.</div>';
+    document.getElementById("list").innerHTML='<div class="empty">Erro ao carregar os dados.</div>';
     console.error(err);
   }
 }
