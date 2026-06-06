@@ -331,6 +331,68 @@ def get_spend_periodo(account_id, dias=3):
         return 0.0
 
 
+def top_criativos(account_id, inicio, fim, limite=5):
+    """Puxa os top criativos (ads) da conta por resultado no periodo. Retorna lista de dicts."""
+    url = "https://graph.facebook.com/v19.0/act_{}/insights".format(account_id)
+    params = {
+        "access_token": META_TOKEN,
+        "fields": "ad_name,actions,cost_per_action_type,spend,impressions",
+        "time_range": json.dumps({"since": inicio, "until": fim}),
+        "level": "ad",
+        "sort": "spend_descending",
+        "limit": limite,
+    }
+    try:
+        r = requests.get(url, params=params, timeout=20)
+        if r.status_code != 200:
+            return []
+        dados = r.json().get("data", [])
+        resultado = []
+        for d in dados:
+            nome = d.get("ad_name", "?")
+            spend = float(d.get("spend", 0) or 0)
+            impr = int(d.get("impressions", 0) or 0)
+            # Extrair melhor metrica de resultado
+            actions = d.get("actions", [])
+            melhor_acao = ""
+            melhor_qtd = 0
+            for a in actions:
+                tipo = a.get("action_type", "")
+                qtd = int(a.get("value", 0) or 0)
+                if qtd > melhor_qtd:
+                    melhor_qtd = qtd
+                    melhor_acao = tipo
+            # CPL/custo por resultado
+            cpa_list = d.get("cost_per_action_type", [])
+            cpa = 0
+            for c in cpa_list:
+                if c.get("action_type") == melhor_acao:
+                    cpa = float(c.get("value", 0) or 0)
+                    break
+            # Traduzir tipo de ação pra portugues simples
+            tipo_label = {
+                "onsite_conversion.messaging_conversation_started_7d": "conversas iniciadas",
+                "lead": "leads",
+                "link_click": "cliques no link",
+                "landing_page_view": "visitas na pagina",
+                "page_engagement": "engajamentos",
+                "post_engagement": "engajamentos no post",
+                "video_view": "visualizacoes de video",
+                "comment": "comentarios",
+                "like": "curtidas",
+                "offsite_conversion.fb_pixel_lead": "leads (pixel)",
+            }.get(melhor_acao, melhor_acao.replace("_", " ") if melhor_acao else "interacoes")
+            if melhor_qtd > 0:
+                resultado.append({
+                    "nome": nome, "resultados": melhor_qtd, "tipo": tipo_label,
+                    "cpr": cpa, "gasto": spend, "impressoes": impr,
+                })
+        return resultado
+    except Exception as e:
+        log("[META] erro top_criativos: {}".format(e))
+        return []
+
+
 def get_meta_todos_periodos(account_id):
     hoje = datetime.now()
     domingo_s1 = hoje - timedelta(days=hoje.weekday() + 1)
@@ -605,6 +667,8 @@ ACOES_ROTATIVAS = {
 
 def _montar_usuario(ctx, dossie, extra=""):
     """Monta o bloco de contexto do usuario pra qualquer prompt."""
+    criativos_bloco = ctx.get("criativos", "")
+    invest = ctx.get("invest", 0)
     return (
         "DADOS ({ini} a {fim}):\n"
         "- Cliente: {cliente}\n"
@@ -613,7 +677,8 @@ def _montar_usuario(ctx, dossie, extra=""):
         "- Fase: {fase}\n"
         "- Gargalo: {gargalo}\n"
         "- Obs semana: {obs}\n"
-        "- Leads: {leads} | CPL: {cpl} | Meta: {meta}\n\n"
+        "- Leads/conversas totais: {leads} | CPL geral: {cpl} | Meta: {meta} | Investimento: {invest}\n\n"
+        "{criativos}\n\n"
         "{extra}"
         "DOSSIE DO CLIENTE:\n{dossie}"
     ).format(
@@ -624,22 +689,42 @@ def _montar_usuario(ctx, dossie, extra=""):
         leads=ctx.get("leads", 0),
         cpl=("R$%.2f" % ctx["cpl"]) if ctx.get("cpl") else "sem dado",
         meta=("R$%.2f" % ctx["meta"]) if ctx.get("meta") else "nao definida",
+        invest=("R$%.2f" % invest) if invest else "nao informado",
+        criativos=criativos_bloco if criativos_bloco else "(sem breakdown de criativos)",
         extra=(extra + "\n\n") if extra else "",
         dossie=(dossie or "Sem dossie. Use o nicho para definir o tom.")[:4500],
     )
 
 
 def gerar_relatorio_ia(ctx, dossie):
-    """TERCA: relatorio de performance no tom do dossie."""
+    """TERCA: relatorio de performance no tom do dossie, citando criativos."""
     sistema = (
         REGRA_BASE + "\n"
-        "Esta e a mensagem de TERCA: relatorio de performance semanal.\n"
-        "1. Comece pelo resultado, linguagem de empresario, sem jargao.\n"
-        "2. Se CPL acima da meta, explique sem assustar e diga a ACAO usando gargalo/obs.\n"
-        "3. Cite dados reais (criativo, dia, horario) so se estiverem nos dados. Nunca invente.\n"
-        "4. NUNCA prometa resultado futuro.\n"
-        "5. Termine com proximo passo ou pergunta leve.\n"
-        "Tamanho: curto pra perfis diretos, mais detalhado pra consultivos."
+        "Esta e a mensagem de TERCA: relatorio de performance semanal com dados reais.\n\n"
+        "ESTRUTURA OBRIGATORIA (adapte o tom ao dossie, mas siga esta estrutura):\n\n"
+        "1. ABERTURA: cumprimento com o nome da pessoa de contato (do dossie). "
+        "Mencione o periodo (ex: 'semana de 25 a 31/05').\n\n"
+        "2. RESULTADOS: traduza os numeros em linguagem de empresario. "
+        "Ex: '245 conversas iniciadas no WhatsApp', nao 'leads'. "
+        "Mostre investimento, CPL e meta. Se CPL abaixo da meta, destaque a % (ex: '66% abaixo da meta'). "
+        "Se acima, explique por que e o que vai fazer.\n\n"
+        "3. DESTAQUES (criticos): se receber TOP CRIATIVOS, CITE OS NOMES dos 2-3 melhores. "
+        "Ex: 'o criativo Tem tapete pra todo canto dominou, 223 dos 245 contatos a R$0,88'. "
+        "Compare performance entre eles. Se um criativo novo entrou com CPL bom, destaque. "
+        "NUNCA ignore os criativos quando eles estao nos dados.\n\n"
+        "4. ANALISE: 1-2 frases interpretando os dados. "
+        "O que explica o resultado? Campanha madura? Criativo novo? Sazonalidade?\n\n"
+        "5. PROXIMOS PASSOS: acao concreta (testar variacao do criativo campeao, explorar novo angulo, "
+        "ajustar publico). Seja especifico ao nicho.\n\n"
+        "6. PERGUNTA DE ENGAJAMENTO: pergunte sobre a qualidade dos contatos, o retorno comercial, "
+        "ou algo relevante ao negocio.\n\n"
+        "REGRAS EXTRAS:\n"
+        "- Se a plataforma for 'Face + Google' e o Meta tiver poucos leads, pode ser porque Meta faz "
+        "conteudo/branding e Google faz lead gen. Explique isso naturalmente.\n"
+        "- Use emojis pra separar secoes (tipo o exemplo). No maximo 4-5 emojis no total.\n"
+        "- Tamanho: medio (8-15 linhas). Nem curto demais, nem texto enorme.\n"
+        "- NUNCA invente dados. Se nao tem criativo, nao cite. Se nao tem CPL, diga.\n"
+        "- Fale como o gestor de trafego que esta no detalhe, nao como um relatorio automatico."
     )
     return _chamar_ia(sistema, _montar_usuario(ctx, dossie))
 
@@ -842,6 +927,17 @@ for t in tasks:
     acao_ia = ""
     SEMANA_MES = semana_do_mes()
     if not conta_parada and ANTHROPIC_API_KEY:
+        # Top criativos da semana (só pra clientes com Meta)
+        criativos = []
+        if usa_meta and mapa_key:
+            criativos = top_criativos(MAPA[mapa_key], periodo_ini, periodo_fim, limite=5)
+        criativos_txt = ""
+        if criativos:
+            linhas = []
+            for i, cr in enumerate(criativos, 1):
+                linhas.append("  {}. \"{}\": {} {} a R${:.2f} cada (gasto R${:.2f})".format(
+                    i, cr["nome"], cr["resultados"], cr["tipo"], cr["cpr"], cr["gasto"]))
+            criativos_txt = "TOP CRIATIVOS DA SEMANA:\n" + "\n".join(linhas)
         ctx_ia = {
             "ini": periodo_ini, "fim": periodo_fim,
             "cliente": display, "nicho": nicho_raw,
@@ -849,6 +945,8 @@ for t in tasks:
             "obs": obs_sem,
             "leads": int(leads_7d) if leads_7d else 0,
             "cpl": c7, "meta": mc,
+            "criativos": criativos_txt,
+            "invest": inv if 'inv' in dir() else 0,
         }
         dossie_txt = achar_dossie(display, DOSSIES)
         # Segunda: abertura motivacional
