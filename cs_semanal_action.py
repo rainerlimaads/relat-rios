@@ -312,6 +312,20 @@ def get_meta_periodo(account_id, inicio, fim):
         return None
 
 
+def get_spend_periodo(account_id, dias=3):
+    """Gasto da conta nos ultimos N dias. Usado para detectar conta parada."""
+    hoje = datetime.now()
+    ini = (hoje - timedelta(days=dias)).strftime("%Y-%m-%d")
+    fim = hoje.strftime("%Y-%m-%d")
+    ins = get_meta_periodo(account_id, ini, fim)
+    if not ins:
+        return 0.0
+    try:
+        return float(ins.get("spend", 0) or 0)
+    except Exception:
+        return 0.0
+
+
 def get_meta_todos_periodos(account_id):
     hoje = datetime.now()
     domingo_s1 = hoje - timedelta(days=hoje.weekday() + 1)
@@ -578,12 +592,21 @@ for t in tasks:
     else:
         em_risco.append(display)
 
+    conta_parada = False
+    if usa_meta and mapa_key:
+        spend_recente = get_spend_periodo(MAPA[mapa_key], 3)
+        # Conta rodou na semana (gerou gasto ou leads) mas zerou o gasto nos ultimos 3 dias = parou
+        if spend_recente < 1.0 and (inv > 0 or int(leads_7d or 0) > 0):
+            conta_parada = True
+            log("[!!] {}: CONTA PARADA (sem gasto nos ultimos 3 dias)".format(nome))
+
     pix_status = "pago" if status_fin == "Pago" else "pendente"
     mensagens.append({
         "nome": display, "saude": saude, "link": link, "msg": msg,
         "segmento": nicho_raw or "", "meta_cpl": mc or "",
         "leads": int(leads_7d) if leads_7d else 0, "cpl": c7 or "",
         "pix_valor": orcamento or "", "pix_status": pix_status,
+        "conta_status": "parada" if conta_parada else "ativa",
     })
 
 # ---- RESUMO ----
@@ -769,12 +792,12 @@ print("\nPagina gerada: https://rainerlimaads.github.io/relat-rios/cs.html")
 import csv
 with open("docs/cs-dados.csv", "w", encoding="utf-8", newline="") as f:
     w = csv.writer(f)
-    w.writerow(["cliente","segmento","meta_cpl","leads","cpl","criativo","pix_valor","pix_status","link_grupo"])
+    w.writerow(["cliente","segmento","meta_cpl","leads","cpl","criativo","pix_valor","pix_status","link_grupo","conta_status"])
     for m in mensagens:
         w.writerow([
             m["nome"], m.get("segmento",""), m.get("meta_cpl",""),
             m.get("leads",""), m.get("cpl",""), "",
             m.get("pix_valor",""), m.get("pix_status","pendente"),
-            m.get("link","") or "",
+            m.get("link","") or "", m.get("conta_status","ativa"),
         ])
 print("CSV do painel gerado: docs/cs-dados.csv")
