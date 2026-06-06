@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de CS — DD Mkt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Albert+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F4F2EC; --surface:#FFFFFF; --ink:#1C1B19; --muted:#6E6C66; --faint:#9A988F;
+    --line:#E4E1D8; --accent:#B5471F;
+    --green:#2E7D52; --green-bg:#E6F2EA;
+    --amber:#9A6B12; --amber-bg:#FBEFD8;
+    --red:#C0392B; --red-bg:#FBE9E7;
+    --blue:#2C6FB0; --blue-bg:#E8F0F8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'Albert Sans',sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased;padding:0 0 80px}
+  .wrap{max-width:880px;margin:0 auto;padding:0 20px}
+  header.top{padding:36px 0 20px}
+  h1{font-family:'Fraunces',serif;font-weight:600;font-size:32px;letter-spacing:-.5px;line-height:1.05}
+  .sub{color:var(--muted);font-size:14px;margin-top:6px}
+  .bar{position:sticky;top:0;z-index:20;background:var(--bg);padding:14px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .stat .n{font-family:'Fraunces',serif;font-size:26px;font-weight:600;line-height:1}
+  .stat .l{font-size:11px;color:var(--muted);margin-top:5px;text-transform:uppercase;letter-spacing:.04em}
+  .stat.risk .n{color:var(--red)}
+  .stat.pix .n{color:var(--accent)}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 4px}
+  .chip{font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;font-weight:500;transition:.15s}
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin-top:14px}
+  .chead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .cname{font-family:'Fraunces',serif;font-size:21px;font-weight:600}
+  .cseg{font-size:12px;color:var(--faint);margin-top:1px}
+  .badges{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .badge{font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;white-space:nowrap}
+  .b-green{background:var(--green-bg);color:var(--green)}
+  .b-amber{background:var(--amber-bg);color:var(--amber)}
+  .b-red{background:var(--red-bg);color:var(--red)}
+  .b-blue{background:var(--blue-bg);color:var(--blue)}
+  .b-pix{background:var(--red-bg);color:var(--red)}
+  .b-pix-ok{background:var(--green-bg);color:var(--green)}
+  .msg{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-size:14.5px;white-space:pre-wrap;color:#2A2925}
+  .mlabel{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:14px 0 7px;font-weight:600}
+  .row{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+  button.act{font-family:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:10px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;transition:.15s}
+  button.act:active{transform:scale(.98)}
+  button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+  button.ghost:hover{border-color:var(--ink)}
+  button.copied{background:var(--green)!important;border-color:var(--green)!important;color:#fff!important}
+  a.act{text-decoration:none;display:inline-block}
+  .empty{text-align:center;color:var(--muted);padding:50px 20px;font-size:15px}
+  .loading{text-align:center;color:var(--muted);padding:40px;font-size:14px}
+  .note{font-size:12px;color:var(--faint);margin-top:24px;text-align:center;line-height:1.7}
+  @media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}h1{font-size:26px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Painel de CS</h1>
+    <div class="sub" id="subtitle">Carregando…</div>
+  </header>
+
+  <div class="bar">
+    <div class="stats">
+      <div class="stat"><div class="n" id="s-green">—</div><div class="l">Dentro da meta</div></div>
+      <div class="stat risk"><div class="n" id="s-risk">—</div><div class="l">Em risco</div></div>
+      <div class="stat pix"><div class="n" id="s-pixn">—</div><div class="l">Pix a cobrar</div></div>
+      <div class="stat pix"><div class="n" id="s-pixv">—</div><div class="l">Total Pix</div></div>
+    </div>
+  </div>
+
+  <div class="controls" id="filters">
+    <div class="chip on" data-f="todos">Todos</div>
+    <div class="chip" data-f="risco">Em risco</div>
+    <div class="chip" data-f="pix">Pix pendente</div>
+    <div class="chip" data-f="meta">Dentro da meta</div>
+  </div>
+
+  <div id="list"><div class="loading">Carregando clientes…</div></div>
+
+  <div class="note" id="note"></div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURAÇÃO — edite só esta parte
+   ============================================================ */
+const CONFIG = {
+  // Cole aqui o link CSV da sua planilha Google publicada.
+  // (Arquivo → Compartilhar → Publicar na web → escolha a aba → formato CSV → copie o link)
+  // Deixe "" para usar os dados de exemplo abaixo.
+  SHEET_CSV_URL: "cs-dados.csv",
+
+  PERIODO: "25/05 a 31/05",        // período do relatório da semana
+
+  // Regra de Pix da verba — só os clientes listados aqui aparecem como "a cobrar".
+  // Valor que voce gera no Meta (QR Code) e envia pro cliente. Edite à vontade.
+  PIX: {
+    "Bom Boi": 300,
+    "Saldão Atacadasso Limeira-SP": 300,
+    "Saldão Atacadasso Macapá": 300,
+    "Saldão Atacadasso Santarém": 300,
+    "Jhonatan": 300,                       // Torre Estrutura metalica e calhas
+    "Mamuh Steakhouse": 300,
+    "Limer Módulos": 725,                  // R$500 Google + R$225 Meta
+    "Athenas Móveis planejados": 1200,     // a cada 10 dias
+  },
+  PIX_OBS: {
+    "Limer Módulos": "R$500 Google Ads + R$225 Meta Ads",
+    "Athenas Móveis planejados": "verba para 10 dias de anúncios",
+  },
+};
+
+/* Dados de exemplo (usados se SHEET_CSV_URL estiver vazio).
+   Colunas da planilha, nesta ordem:
+   cliente | segmento | meta_cpl | leads | cpl | criativo | pix_valor | pix_status | grupo_link
+   pix_status: "pago" ou "pendente" */
+const SAMPLE = [
+  ["Jhonatan","Imobiliário","10","1","44.05","Vídeo depoimento","300","pendente",""],
+  ["Loja de roupa","Varejo","12","38","9.40","Carrossel coleção","250","pago",""],
+  ["Clínica Brivva","Odontologia","25","19","22.10","Vídeo Dr. Cássio","400","pendente",""],
+  ["Athenas Planejados","Móveis","30","12","27.80","Portal das Rosas","350","pago",""],
+  ["Atacado Semijoias","Atacado","8","9","13.50","Reels feira","200","pendente",""],
+];
+
+/* ============================================================
+   LÓGICA — não precisa mexer daqui pra baixo
+   ============================================================ */
+const brl = n => "R$ " + Number(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const num = v => { const n = parseFloat(String(v).replace(",",".").replace(/[^\d.]/g,"")); return isNaN(n)?0:n; };
+
+function statusOf(meta, cpl, leads){
+  if(leads <= 1 || cpl > meta*1.6) return "vermelho";
+  if(cpl > meta) return "amarelo";
+  return "verde";
+}
+
+function badge(st){
+  if(st==="verde")  return '<span class="badge b-green">Dentro da meta</span>';
+  if(st==="amarelo")return '<span class="badge b-amber">Atenção</span>';
+  return '<span class="badge b-red">Em risco</span>';
+}
+
+/* Gera a mensagem de relatório — tom e estrutura variam por status */
+function gerarRelatorio(c){
+  const {nome, leads, cpl, meta, criativo} = c;
+  const per = CONFIG.PERIODO;
+  const oport = leads === 1 ? "1 oportunidade" : `${leads} oportunidades`;
+
+  if(c.status === "verde"){
+    return `Bom dia, ${nome}! 🙌
+
+Relatório da semana (${per}) 👇
+
+Geramos ${oport} a ${brl(cpl)} cada — dentro da nossa meta de ${brl(meta)}. Semana sólida.
+
+Destaque: o criativo "${criativo}" foi o que mais puxou resultado.
+
+Essa semana o foco é escalar o que está funcionando e testar um novo ângulo pra trazer ainda mais volume com qualidade.
+
+Conseguiram dar retorno pra todas as oportunidades? A velocidade de resposta faz diferença direta na conversão. 🎯`;
+  }
+
+  if(c.status === "amarelo"){
+    return `Bom dia, ${nome}!
+
+Relatório da semana (${per}) 👇
+
+Tivemos ${oport} a ${brl(cpl)} cada — um pouco acima da nossa meta de ${brl(meta)}.
+
+Não é motivo de alarme, mas já estou agindo. Essa semana vou:
+• Revisar os criativos com menor desempenho
+• Testar um novo ângulo de comunicação pra reduzir o custo
+
+Acompanho de perto e te trago um update no meio da semana. Como está a qualidade das oportunidades que chegaram? 💪`;
+  }
+
+  // vermelho
+  return `Bom dia, ${nome}.
+
+Relatório da semana (${per}) 👇
+
+Tivemos ${oport} a ${brl(cpl)} cada — acima da nossa meta de ${brl(meta)}.
+
+Quero ser direto com você: essa conta está com atenção total essa semana. Vou revisar a estrutura das campanhas e ajustar a segmentação pra recuperar a eficiência.
+
+Te trago um diagnóstico com plano de ação até quarta — você vai ser o primeiro a saber.
+
+Uma pergunta importante: vocês conseguiram dar retorno rápido pra todas as oportunidades? Lead parado esfria e encarece o resultado.`;
+}
+
+/* Mensagem de cobrança de Pix da verba */
+function gerarPix(c){
+  const obs = c.pix_obs ? ` (${c.pix_obs})` : "";
+  return `Oi ${c.nome}, bom dia!
+
+Segue a verba de mídia dessa semana: ${brl(c.pix_valor)}${obs}.
+
+Vou te enviar o Pix por QR Code na sequência. Assim que cair, já mantenho as campanhas rodando sem interrupção. 🙏`;
+}
+
+/* Parser CSV simples (lida com aspas) */
+function parseCSV(text){
+  const rows=[]; let row=[],val="",q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){val+='"';i++} else q=false } else val+=ch }
+    else{ if(ch==='"')q=true; else if(ch===","){row.push(val);val=""} else if(ch==="\n"){row.push(val);rows.push(row);row=[];val=""} else if(ch!=="\r")val+=ch }
+  }
+  if(val.length||row.length){row.push(val);rows.push(row)}
+  return rows.filter(r=>r.some(x=>x.trim()!==""));
+}
+
+function toClientes(rows){
+  // pula cabeçalho se a primeira coluna não for número na 3ª posição
+  let data = rows;
+  if(rows.length && isNaN(num(rows[0][2]))) data = rows.slice(1);
+  return data.map(r=>{
+    const meta=num(r[2]), cpl=num(r[4]), leads=Math.round(num(r[3]));
+    return {
+      nome:(r[0]||"").trim(), segmento:(r[1]||"").trim(),
+      meta, leads, cpl, criativo:(r[5]||"criativo principal").trim(),
+      pix_valor:(CONFIG.PIX[(r[0]||"").trim()] || 0), pix_obs:(CONFIG.PIX_OBS[(r[0]||"").trim()] || ""),
+      grupo:(r[8]||"").trim(),
+      status: statusOf(meta, cpl, leads)
+    };
+  });
+}
+
+let CLIENTES=[], FILTRO="todos";
+
+function render(){
+  const list=document.getElementById("list");
+  let arr=CLIENTES;
+  if(FILTRO==="risco") arr=CLIENTES.filter(c=>c.status!=="verde");
+  if(FILTRO==="meta")  arr=CLIENTES.filter(c=>c.status==="verde");
+  if(FILTRO==="pix")   arr=CLIENTES.filter(c=>c.pix_valor>0);
+
+  if(!arr.length){ list.innerHTML='<div class="empty">Nenhum cliente neste filtro.</div>'; return; }
+
+  list.innerHTML=arr.map((c,i)=>{
+    const relId="rel"+i, pixId="pix"+i;
+    const temPix = c.pix_valor > 0;
+    const pixBadge = temPix
+      ? `<span class="badge b-pix">Pix a cobrar · ${brl(c.pix_valor)}</span>`
+      : "";
+    const grupoBtn = c.grupo ? `<a class="act ghost" href="${c.grupo}" target="_blank" rel="noopener">Abrir grupo</a>` : "";
+    const pixBlock = temPix ? `
+      <div class="mlabel">Cobrança de Pix da verba</div>
+      <div class="msg" id="${pixId}">${gerarPix(c)}</div>
+      <div class="row"><button class="act" onclick="copy('${pixId}',this)">Copiar cobrança de Pix</button></div>` : "";
+    return `
+    <div class="card">
+      <div class="chead">
+        <div><div class="cname">${c.nome}</div><div class="cseg">${c.segmento||""}</div></div>
+        <div class="badges">${badge(c.status)}${pixBadge}</div>
+      </div>
+      <div class="mlabel">Relatório de performance — copiar e enviar no grupo</div>
+      <div class="msg" id="${relId}">${gerarRelatorio(c)}</div>
+      <div class="row">
+        <button class="act" onclick="copy('${relId}',this)">Copiar relatório</button>
+        ${grupoBtn}
+      </div>
+      ${pixBlock}
+    </div>`;
+  }).join("");
+}
+
+function copy(id,btn){
+  const t=document.getElementById(id).innerText;
+  navigator.clipboard.writeText(t).then(()=>{
+    const old=btn.textContent; btn.textContent="Copiado ✓"; btn.classList.add("copied");
+    setTimeout(()=>{btn.textContent=old;btn.classList.remove("copied")},1600);
+  });
+}
+
+function updateStats(){
+  const verde=CLIENTES.filter(c=>c.status==="verde").length;
+  const risco=CLIENTES.filter(c=>c.status!=="verde").length;
+  const pixPend=CLIENTES.filter(c=>c.pix_valor>0);
+  const totalPix=pixPend.reduce((s,c)=>s+c.pix_valor,0);
+  document.getElementById("s-green").textContent=verde;
+  document.getElementById("s-risk").textContent=risco;
+  document.getElementById("s-pixn").textContent=pixPend.length;
+  document.getElementById("s-pixv").textContent=brl(totalPix);
+  document.getElementById("subtitle").textContent=
+    `Semana ${CONFIG.PERIODO} · ${CLIENTES.length} clientes · atualizado ${new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}`;
+}
+
+document.getElementById("filters").addEventListener("click",e=>{
+  if(!e.target.classList.contains("chip"))return;
+  document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
+  e.target.classList.add("on"); FILTRO=e.target.dataset.f; render();
+});
+
+async function boot(){
+  try{
+    let rows;
+    if(CONFIG.SHEET_CSV_URL){
+      const res=await fetch(CONFIG.SHEET_CSV_URL,{cache:"no-store"});
+      rows=parseCSV(await res.text());
+      document.getElementById("note").textContent="Dados ao vivo da planilha. Atualize a planilha e recarregue a página para ver os números novos.";
+    }else{
+      rows=SAMPLE.map(r=>r.slice());
+      document.getElementById("note").textContent="Mostrando dados de EXEMPLO. Configure SHEET_CSV_URL no código para puxar dados reais da sua planilha.";
+    }
+    CLIENTES=toClientes(rows);
+    updateStats(); render();
+  }catch(err){
+    document.getElementById("list").innerHTML='<div class="empty">Não consegui carregar a planilha. Confira se o link CSV está publicado e correto.</div>';
+    console.error(err);
+  }
+}
+boot();
+</script>
+</body>
+</html>
