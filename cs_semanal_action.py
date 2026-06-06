@@ -31,6 +31,7 @@ CAMPOS = {
     "saude_conta":        "52652d4c-250c-43ad-b6c7-fc15d2d4879a",
     "fase_campanha":      "592b5368-2199-4201-9de5-8c4544ec1e35",
     "orcamento_midia":    "ea84ccdd-414f-475d-81f3-51a45b6252f9",
+    "status_financeiro":  "4712f853-fdf7-4ad1-8882-3c1fca98818e",
 }
 
 MAPA = {
@@ -475,6 +476,8 @@ for t in tasks:
     link = get_campo(t, CAMPOS["link_grupo"])
     nicho_raw = get_campo(t, CAMPOS["nicho"])
     fase = get_campo(t, CAMPOS["fase_campanha"])
+    status_fin = get_campo(t, CAMPOS["status_financeiro"])
+    orcamento = get_campo(t, CAMPOS["orcamento_midia"])
     nicho_key = detectar_nicho(nicho_raw or nome)
 
     usa_meta = plat in ["Meta Ads", "Face + Google"]
@@ -575,7 +578,13 @@ for t in tasks:
     else:
         em_risco.append(display)
 
-    mensagens.append({"nome": display, "saude": saude, "link": link, "msg": msg})
+    pix_status = "pago" if status_fin == "Pago" else "pendente"
+    mensagens.append({
+        "nome": display, "saude": saude, "link": link, "msg": msg,
+        "segmento": nicho_raw or "", "meta_cpl": mc or "",
+        "leads": int(leads_7d) if leads_7d else 0, "cpl": c7 or "",
+        "pix_valor": orcamento or "", "pix_status": pix_status,
+    })
 
 # ---- RESUMO ----
 log("\n" + "=" * 60)
@@ -754,3 +763,18 @@ with open("docs/cs.html", "w", encoding="utf-8") as f:
     f.write(html)
 
 print("\nPagina gerada: https://rainerlimaads.github.io/relat-rios/cs.html")
+
+
+# ---- CSV PARA O PAINEL NOVO (cs-painel.html le este arquivo) ----
+import csv
+with open("docs/cs-dados.csv", "w", encoding="utf-8", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(["cliente","segmento","meta_cpl","leads","cpl","criativo","pix_valor","pix_status","link_grupo"])
+    for m in mensagens:
+        w.writerow([
+            m["nome"], m.get("segmento",""), m.get("meta_cpl",""),
+            m.get("leads",""), m.get("cpl",""), "",
+            m.get("pix_valor",""), m.get("pix_status","pendente"),
+            m.get("link","") or "",
+        ])
+print("CSV do painel gerado: docs/cs-dados.csv")
