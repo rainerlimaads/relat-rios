@@ -1,19 +1,19 @@
-cliente,segmento,meta_cpl,leads,cpl,criativo,pix_valor,pix_status,link_grupo
-Jhonatan,Calhas e estrututuras,10.0,1,44.05,,1200,pago,https://web.whatsapp.com/
-Loja de roupa ,Vestúario moda feminina,8.0,6,11.04,,1200,pago,https://chat.whatsapp.com/BCNSHGhLzoi9VhYlG4KyUy
-Premium Celulares,Celulares e manutenção ,30.0,6,27.35,,1200,pago,https://chat.whatsapp.com/KLt5CjgX9jCFl3aIUdl7Yd
-Mamuh Steakhouse,Restaurante ,8.0,7,12.34,,1200,pendente,https://web.whatsapp.com/
-Limer Seguros ,Seguros e Consórcios,25.0,12,23.87,,1200,pago,https://chat.whatsapp.com/FCKinCrhmGo5dPWvGG62MN
-Instituto Lopes Machado,Odontologia,25.0,9,22.95,,2000,pago,https://chat.whatsapp.com/KvOO3UO6KyK7IKW8Wr8gEM
-Saldão Atacadasso Santarém,Atacado Santarém,2.0,102,2.65,,1200,pago,https://chat.whatsapp.com/IN0hSDsO7dV0Q6sBK7ErNE
-Exclusive O'Store,Loja especializada Oakley,60.0,72,9.48,,2000,pago,https://web.whatsapp.com/
-Disk Farma Piracicaba,Farmácia de Manipulados,6.0,326,5.56,,4000,pago,https://chat.whatsapp.com/GTtjaOSq6DpLUmCH4XqhpS
-Mercado da Semijoia,Shopping Atacadista,6.0,2,105.05,,1500,pago,https://web.whatsapp.com/
-Dr. Ademir Esperidião,Nutrologia,25.0,85,3.11,,1500,pago,https://web.whatsapp.com/
-Stillo Modas,Vestúario Feminino,4.0,188,3.43,,2000,pago,https://web.whatsapp.com/
-Saldão Atacadasso Limeira-SP,Atacado ,6.0,60,4.39,,1200,pago,https://web.whatsapp.com/
-Athenas Móveis planejados,Móveis Planejados,25.0,17,31.85,,3600,pago,https://web.whatsapp.com/
-Tendência Planejados,Movéis Planejados,20.0,10,22.05,,1200,pago,https://web.whatsapp.com/
-Bom Boi,Açogue ,5.0,64,4.74,,1200,pago,https://web.whatsapp.com/
-Saldão Atacadasso Macapá,Atacado Macapá,2.5,63,1.24,,1200,pago,https://web.whatsapp.com/
-Limer Módulos,Módulos e painéis eletrônicos,30.0,6,46.75,,2900,pago,https://web.whatsapp.com/
+cliente,segmento,meta_cpl,leads,cpl,criativo,pix_valor,pix_status,link_grupo,conta_status
+Jhonatan,Calhas e estrututuras,10.0,1,44.05,,1200,pago,https://web.whatsapp.com/,parada
+Loja de roupa ,Vestúario moda feminina,8.0,6,11.04,,1200,pago,https://chat.whatsapp.com/BCNSHGhLzoi9VhYlG4KyUy,parada
+Premium Celulares,Celulares e manutenção ,30.0,6,27.35,,1200,pago,https://chat.whatsapp.com/KLt5CjgX9jCFl3aIUdl7Yd,ativa
+Mamuh Steakhouse,Restaurante ,8.0,7,12.34,,1200,pendente,https://web.whatsapp.com/,parada
+Limer Seguros ,Seguros e Consórcios,25.0,12,23.87,,1200,pago,https://chat.whatsapp.com/FCKinCrhmGo5dPWvGG62MN,ativa
+Instituto Lopes Machado,Odontologia,25.0,9,22.95,,2000,pago,https://chat.whatsapp.com/KvOO3UO6KyK7IKW8Wr8gEM,ativa
+Saldão Atacadasso Santarém,Atacado Santarém,2.0,102,2.65,,1200,pago,https://chat.whatsapp.com/IN0hSDsO7dV0Q6sBK7ErNE,ativa
+Exclusive O'Store,Loja especializada Oakley,60.0,72,9.48,,2000,pago,https://web.whatsapp.com/,ativa
+Disk Farma Piracicaba,Farmácia de Manipulados,6.0,326,5.56,,4000,pago,https://chat.whatsapp.com/GTtjaOSq6DpLUmCH4XqhpS,parada
+Mercado da Semijoia,Shopping Atacadista,6.0,2,105.05,,1500,pago,https://web.whatsapp.com/,ativa
+Dr. Ademir Esperidião,Nutrologia,25.0,85,3.11,,1500,pago,https://web.whatsapp.com/,ativa
+Stillo Modas,Vestúario Feminino,4.0,188,3.43,,2000,pago,https://web.whatsapp.com/,ativa
+Saldão Atacadasso Limeira-SP,Atacado ,6.0,60,4.39,,1200,pago,https://web.whatsapp.com/,ativa
+Athenas Móveis planejados,Móveis Planejados,25.0,17,31.85,,3600,pago,https://web.whatsapp.com/,ativa
+Tendência Planejados,Movéis Planejados,20.0,10,22.05,,1200,pago,https://web.whatsapp.com/,ativa
+Bom Boi,Açogue ,5.0,64,4.74,,1200,pago,https://web.whatsapp.com/,ativa
+Saldão Atacadasso Macapá,Atacado Macapá,2.5,63,1.24,,1200,pago,https://web.whatsapp.com/,ativa
+Limer Módulos,Módulos e painéis eletrônicos,30.0,6,46.75,,2900,pago,https://web.whatsapp.com/,ativa
