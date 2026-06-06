@@ -593,12 +593,14 @@ for t in tasks:
         em_risco.append(display)
 
     conta_parada = False
-    if usa_meta and mapa_key:
+    # So detecta "conta parada" para clientes onde o Meta e o canal de leads (Meta Ads puro).
+    # Clientes com Google (Google Ads / Face + Google) podem ter o Meta zerado sem estar parados
+    # — o lead deles vem do Google, que este script nao enxerga. Evita falso positivo.
+    if mapa_key and plat == "Meta Ads":
         spend_recente = get_spend_periodo(MAPA[mapa_key], 3)
-        # Conta rodou na semana (gerou gasto ou leads) mas zerou o gasto nos ultimos 3 dias = parou
         if spend_recente < 1.0 and (inv > 0 or int(leads_7d or 0) > 0):
             conta_parada = True
-            log("[!!] {}: CONTA PARADA (sem gasto nos ultimos 3 dias)".format(nome))
+            log("[!!] {}: CONTA PARADA (Meta sem gasto nos ultimos 3 dias)".format(nome))
 
     pix_status = "pago" if status_fin == "Pago" else "pendente"
     mensagens.append({
