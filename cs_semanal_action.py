@@ -331,8 +331,13 @@ def get_spend_periodo(account_id, dias=3):
         return 0.0
 
 
-def top_criativos(account_id, inicio, fim, limite=5):
-    """Puxa os top criativos (ads) da conta por resultado no periodo. Retorna lista de dicts."""
+def top_criativos(account_id, limite=5):
+    """Puxa os top criativos (ads) da conta na ultima semana. Calcula datas YYYY-MM-DD internamente."""
+    hoje = datetime.now()
+    domingo = hoje - timedelta(days=hoje.weekday() + 1)
+    segunda = domingo - timedelta(days=6)
+    inicio = segunda.strftime("%Y-%m-%d")
+    fim = domingo.strftime("%Y-%m-%d")
     url = "https://graph.facebook.com/v21.0/act_{}/insights".format(account_id)
     params = {
         "access_token": META_TOKEN,
@@ -962,7 +967,7 @@ for t in tasks:
         # Top criativos da semana (só pra clientes com Meta)
         criativos = []
         if usa_meta and mapa_key:
-            criativos = top_criativos(MAPA[mapa_key], periodo_ini, periodo_fim, limite=5)
+            criativos = top_criativos(MAPA[mapa_key], limite=5)
         criativos_txt = ""
         if criativos:
             linhas = []
