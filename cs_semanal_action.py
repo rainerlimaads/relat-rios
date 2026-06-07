@@ -339,7 +339,7 @@ def top_criativos(account_id, inicio, fim, limite=5):
         "fields": "ad_name,actions,cost_per_action_type,spend,impressions",
         "time_range": json.dumps({"since": inicio, "until": fim}),
         "level": "ad",
-        "limit": 25,
+        "limit": 200,
     }
     try:
         r = requests.get(url, params=params, timeout=30)
@@ -736,6 +736,8 @@ def gerar_relatorio_ia(ctx, dossie):
         "- Tamanho: medio (8-15 linhas). Nem curto demais, nem texto enorme.\n"
         "- NUNCA invente dados. Se nao tem criativo, nao cite. Se nao tem CPL, diga.\n"
         "- Se recebeu TOP CRIATIVOS nos dados, e OBRIGATORIO citar pelo menos o top 1 com nome e numeros.\n"
+        "- Se NAO recebeu top criativos, NAO mencione que faltou breakdown ou dados. Fale da performance "
+        "geral sem citar criativos. Nunca diga 'nao recebi' ou 'nao tive acesso'. Fale do que tem.\n"
         "- Fale como o gestor de trafego que esta no detalhe, nao como um relatorio automatico."
     )
     return _chamar_ia(sistema, _montar_usuario(ctx, dossie))
@@ -949,7 +951,12 @@ for t in tasks:
             for i, cr in enumerate(criativos, 1):
                 linhas.append("  {}. \"{}\": {} {} a R${:.2f} cada (gasto R${:.2f})".format(
                     i, cr["nome"], cr["resultados"], cr["tipo"], cr["cpr"], cr["gasto"]))
-            criativos_txt = "TOP CRIATIVOS DA SEMANA:\n" + "\n".join(linhas)
+            criativos_txt = "TOP CRIATIVOS DA SEMANA (somente Meta Ads):\n" + "\n".join(linhas)
+            if plat and "google" in plat.lower():
+                criativos_txt += ("\n\nNOTA IMPORTANTE: estes criativos sao APENAS do Meta Ads. "
+                    "O total de leads/contatos informado acima INCLUI resultados do Google Ads "
+                    "(ligacoes, formularios, etc). Nao apresente o total como se fosse so do Meta. "
+                    "Explique que o Google traz os contatos diretos e o Meta faz reconhecimento/branding.")
         ctx_ia = {
             "ini": periodo_ini, "fim": periodo_fim,
             "cliente": display, "nicho": nicho_raw,
