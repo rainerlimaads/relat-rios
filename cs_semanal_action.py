@@ -931,7 +931,7 @@ for t in tasks:
     else:
         saude = "Dentro da Meta"
 
-    display = empresa or nome
+    display = (empresa or nome).strip()
 
     msg = gerar_mensagem(
         display=display, plat=plat or "Meta Ads", nicho_key=nicho_key,
