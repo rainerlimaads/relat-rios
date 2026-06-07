@@ -333,29 +333,45 @@ def get_spend_periodo(account_id, dias=3):
 
 def top_criativos(account_id, inicio, fim, limite=5):
     """Puxa os top criativos (ads) da conta por resultado no periodo. Retorna lista de dicts."""
-    url = "https://graph.facebook.com/v19.0/act_{}/insights".format(account_id)
+    url = "https://graph.facebook.com/v21.0/act_{}/insights".format(account_id)
     params = {
         "access_token": META_TOKEN,
         "fields": "ad_name,actions,cost_per_action_type,spend,impressions",
         "time_range": json.dumps({"since": inicio, "until": fim}),
         "level": "ad",
-        "limit": 200,
+        "limit": 500,
     }
+    all_dados = []
     try:
-        r = requests.get(url, params=params, timeout=30)
-        if r.status_code != 200:
-            log("[META] top_criativos status {} para conta {}".format(r.status_code, account_id))
+        # Paginacao automatica (max 3 paginas = 1500 ads)
+        for pagina in range(3):
+            r = requests.get(url, params=params, timeout=30)
+            log("[META] top_criativos conta {} pagina {} status={} bytes={}".format(
+                account_id, pagina+1, r.status_code, len(r.text)))
+            if r.status_code != 200:
+                log("[META] top_criativos ERRO: {}".format(r.text[:300]))
+                break
+            resp = r.json()
+            dados = resp.get("data", [])
+            all_dados.extend(dados)
+            # Proxima pagina?
+            next_url = resp.get("paging", {}).get("next")
+            if not next_url or not dados:
+                break
+            url = next_url
+            params = {}  # next_url ja tem os params
+        if not all_dados:
+            log("[META] top_criativos: 0 ads retornados para conta {}".format(account_id))
             return []
-        dados = r.json().get("data", [])
-        if not dados:
-            log("[META] top_criativos: sem dados para conta {} ({} a {})".format(account_id, inicio, fim))
-            return []
+        log("[META] top_criativos: {} ads brutos para conta {}".format(len(all_dados), account_id))
         resultado = []
-        for d in dados:
+        for d in all_dados:
             nome = d.get("ad_name", "?")
             spend = float(d.get("spend", 0) or 0)
             impr = int(d.get("impressions", 0) or 0)
             actions = d.get("actions", [])
+            if not actions:
+                continue
             melhor_acao = ""
             melhor_qtd = 0
             for a in actions:
@@ -364,6 +380,8 @@ def top_criativos(account_id, inicio, fim, limite=5):
                 if qtd > melhor_qtd:
                     melhor_qtd = qtd
                     melhor_acao = tipo
+            if melhor_qtd <= 0:
+                continue
             cpa_list = d.get("cost_per_action_type", [])
             cpa = 0
             for c in cpa_list:
@@ -383,17 +401,17 @@ def top_criativos(account_id, inicio, fim, limite=5):
                 "offsite_conversion.fb_pixel_lead": "leads (pixel)",
                 "profile_visit_view": "visitas ao perfil",
             }.get(melhor_acao, melhor_acao.replace("_", " ") if melhor_acao else "interacoes")
-            if melhor_qtd > 0:
-                resultado.append({
-                    "nome": nome, "resultados": melhor_qtd, "tipo": tipo_label,
-                    "cpr": cpa, "gasto": spend, "impressoes": impr,
-                })
-        # Ordena por resultados desc e retorna top N
+            resultado.append({
+                "nome": nome, "resultados": melhor_qtd, "tipo": tipo_label,
+                "cpr": cpa, "gasto": spend, "impressoes": impr,
+            })
         resultado.sort(key=lambda x: x["resultados"], reverse=True)
-        log("[META] top_criativos: {} ads encontrados para conta {}".format(len(resultado), account_id))
+        log("[META] top_criativos: {} ads com resultado para conta {}".format(len(resultado), account_id))
         return resultado[:limite]
     except Exception as e:
-        log("[META] erro top_criativos: {}".format(e))
+        log("[META] EXCECAO top_criativos: {}".format(e))
+        import traceback
+        log(traceback.format_exc())
         return []
 
 
